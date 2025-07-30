@@ -301,7 +301,7 @@ if __name__ == "__main__":
         since_date = latest_commits.get(repo_suffix, None)
 
         logger.info(
-            f"Processing {k}/{no_repos} repo {repo_no}:{repo_suffix} at {repo_http_url}: get commits since {since_date}"
+            f"Processing {k}/{no_repos} repo {repo_no}:{repo_suffix} at {repo_http_url} : get commits since {since_date}"
         )
 
         try:

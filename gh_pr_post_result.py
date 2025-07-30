@@ -348,7 +348,7 @@ if __name__ == "__main__":
             # Here there is a proper submission!
             # Issue the autograder report & feedback summary
 
-            # First, create a new comment in PR with automarker report
+            # First, create a new comment in PR with automarker report (if any)
             if not args.no_report:
                 file_report = os.path.join(
                     args.REPORT_FOLDER, f"{repo_id}.{args.extension}"
@@ -393,7 +393,7 @@ if __name__ == "__main__":
                     message += f"\n{FEEDBACK_MESSAGE}"
                     issue_feedback_comment(pr_feedback, message, args.dry_run)
 
-            # Second, create comment with the feedback summary
+            # Second, create COMMENT with the feedback summary
             if not args.no_feedback:
                 feedback_text = report_feedback(marking_repo)
                 if feedback_text is not None:
