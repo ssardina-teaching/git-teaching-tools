@@ -48,10 +48,15 @@ coloredlogs.install(
     logger=logger, level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE
 )
 
+
+#####################################
+# LOCAL GLOBAL VARIABLES FOR SCRIPT
+#####################################
 CSV_HEADER = ["REPO_ID_SUFFIX", "AUTHOR", "COMMITS", "ADDITIONS", "DELETIONS"]
 CSV_ERRORS = "pr_comment_errors.csv"
-SLEEP_TIME = 5  # sleep time in seconds between API calls
 
+SLEEP_RATE = 10  # number of repos to process before sleeping
+SLEEP_TIME = 5  # sleep time in seconds between API calls
 
 def load_marking_dict(file_path: str, col_key="GHU") -> dict:
     """
@@ -156,7 +161,7 @@ if __name__ == "__main__":
     if args.repos is None:
         start_no = args.start if args.start is not None else 0
         end_no = args.end if args.end is not None else len(list_repos)
-        print(start_no, end_no)
+        logger.info(f"Getting repos {start_no} to {end_no}")
         list_repos = list_repos[start_no - 1 : end_no]
 
     logger.info(args)
@@ -188,10 +193,11 @@ if __name__ == "__main__":
     no_repos = len(list_repos)
     errors = []
     for k, r in enumerate(list_repos):
-        if k % 10 == 0 and k > 0:
+        if k % SLEEP_RATE == 0 and k > 0:
             logger.info(f"Sleep for {SLEEP_TIME} seconds...")
             time.sleep(SLEEP_TIME)
 
+        repo_no = r["NO"]
         repo_id = r["REPO_ID_SUFFIX"].lower()
         repo_name = r["REPO_ID"]
         # repo_url = f"https://github.com/{repo_name}"
