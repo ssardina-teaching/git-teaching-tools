@@ -226,6 +226,12 @@ if __name__ == "__main__":
         )
         exit(1)
 
+    if (args.start < 1) or (args.end and args.start > args.end):
+        logger.error(
+            f"Start number has to be 1+ and less than --end."
+        )
+        exit(1)
+
     ###############################################
     # Load feedback report builder module and marking spreadsheet
     # https://medium.com/@Doug-Creates/dynamically-import-a-module-by-full-path-in-python-bbdf4815153e
@@ -255,7 +261,9 @@ if __name__ == "__main__":
     ###############################################
     # Filter repos as requested
     ###############################################
+    # get the specific repos to process (if any)
     repos_process = args.repos or get_repos()
+    # get all the repos available in the repo CSV database
     repos = util.get_repos_from_csv(
         args.REPO_CSV,
         repos_process,
@@ -265,7 +273,9 @@ if __name__ == "__main__":
     # TODO: start and end clashes badly if ignore, repos, or get_repos are used
     # only allow --start and --end if no repos or ignore are given
     if repos_process is None:
+        start_no = args.start if args.start is not None else 1
         end_no = args.end if args.end is not None else len(repos)
+        logger.info(f"Getting repos {start_no} to {end_no}")
         repos = repos[args.start - 1 : end_no]
 
     if len(repos) == 0:
@@ -294,7 +304,7 @@ if __name__ == "__main__":
     authors_stats = []
     no_repos = len(repos)
     errors = []
-    for k, r in enumerate(repos, start=1):
+    for k, r in enumerate(repos):
         if k % SLEEP_RATE == 0 and k > 0:
             logger.info(f"Sleep for {SLEEP_TIME} seconds...")
             time.sleep(SLEEP_TIME)
@@ -305,7 +315,7 @@ if __name__ == "__main__":
         # repo_url = f"https://github.com/{repo_name}"
         repo_url = r["REPO_HTTP"]
         logger.info(
-            f"Processing repo {k}/{no_repos}: {repo_no}:{repo_id} ({repo_url})..."
+            f"Processing repo {k+start_no}/{end_no}: {repo_no}:{repo_id} ({repo_url})..."
         )
 
         repo = g.get_repo(repo_name)
@@ -342,6 +352,7 @@ if __name__ == "__main__":
             message, skip = check_submission(repo_id, marking_repo, logger)
             if message is not None:
                 issue_feedback_comment(pr_feedback, message, args.dry_run)
+                logger.info(f"\t Feedback warning/error posted to {pr_feedback.html_url}.")
             if skip:
                 continue
 
