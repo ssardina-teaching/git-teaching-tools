@@ -40,7 +40,7 @@ def get_repos_from_csv(csv_file, repos_ids=None, ignore_ids=None) -> list[dict]:
 
     :param csv_file: file where csv data is with two fields TEAM and GIT
     :param repos_ids: list of specific repo names to consider or None
-    :param repos_ids: list of specific repo names to ignore or None
+    :param ignore_ids: list of specific repo names to ignore or None
     :return: a list of dictionaries for each repo (name, url, etc)
             e.g., {'ORG_NAME': 'RMIT-COSC1127-1125-AI24', 'REPO_ID_PREFIX': 'p0-warmup', 'REPO_ID_SUFFIX': 'msardina', 'REPO_ID': 'RMIT-COSC1127-1125-AI24/p0-warmup-msardina', 'REPO_URL': 'git@github.com:RMIT-COSC1127-1125-AI24/p0-warmup-msardina.git'}
     """
