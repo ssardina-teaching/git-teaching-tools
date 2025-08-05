@@ -52,7 +52,7 @@ CSV_CHECK = "pr_check.csv"
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Merge PRs in multiple repos")
+    parser = ArgumentParser(description="Check PRs: missing, merged, forced pushed")
     parser.add_argument("REPO_CSV", help="List of repositories to get data from.")
     parser.add_argument(
         "-t",
