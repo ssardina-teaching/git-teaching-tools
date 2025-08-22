@@ -65,6 +65,7 @@ CSV_HEADER = [
 ]
 CSV_HEADER_TYPE = {"DATE": datetime, "ADDITIONS": int, "DELETIONS": int}
 CSV_HEADER_STATS = ["REPO", "AUTHOR", "COMMITS", "ADDITIONS", "DELETIONS"]
+CSV_HEADER_ERRORS = ["REPO", "ERROR"]
 GH_URL_PREFIX = "https://github.com/"
 IGNORE_USERS = [
     "web-flow",
@@ -285,13 +286,14 @@ if __name__ == "__main__":
 
     # 2. Process each repo: collect all commits from all authors since latest_commits recording
     repos_commits = dict()
+    errors_csv = []  # repos that had errors
     no_repos = len(repos)
     # repos.sort(key=lambda tup: tup["REPO_ID_SUFFIX"].lower())
     for k, row in enumerate(repos, start=1):
         if k % SLEEP_RATE == 0 and k > 0:
             logger.info(f"Sleep for {SLEEP_TIME} seconds...")
             time.sleep(SLEEP_TIME)
-            
+
         repo_no = row["NO"]
         repo_id = row["REPO_ID"]  # RMIT-COSC2978/ssardina
         repo_suffix = row["REPO_ID_SUFFIX"]  # ssardina
@@ -311,6 +313,7 @@ if __name__ == "__main__":
             )
         except Exception as e:
             logger.info(f"\t Exception repo {repo_suffix}: {e}")
+            errors_csv.append({"REPO": repo_id, "ERROR": e})
             continue
 
         no_commits = len(repos_commits[repo_suffix])
@@ -342,7 +345,7 @@ if __name__ == "__main__":
 
     # 5. Now we build the aggregated stats for each author in each repo
     #  we build a list of dicts with the following fields:
-    #   - repo, author, no_commits, no_additions, no_deletions 
+    #   - repo, author, no_commits, no_additions, no_deletions
     author_stats_cvs = []
     repos = set([c['REPO'] for c in commits_csv])
     for repo in repos: 
@@ -386,3 +389,9 @@ if __name__ == "__main__":
         csv_writer = csv.DictWriter(output_csv_file, fieldnames=CSV_HEADER_STATS)
         csv_writer.writeheader()
         csv_writer.writerows(author_stats_cvs)
+
+    csv_error_file = csv_file.with_name(csv_file.stem + "_errors").with_suffix(".csv")
+    with open(csv_error_file, "w") as output_csv_file:
+        csv_writer = csv.DictWriter(output_csv_file, fieldnames=CSV_HEADER_ERRORS)
+        csv_writer.writeheader()
+        csv_writer.writerows(errors_csv)
