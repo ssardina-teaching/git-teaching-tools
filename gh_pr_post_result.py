@@ -272,6 +272,8 @@ if __name__ == "__main__":
 
     # TODO: start and end clashes badly if ignore, repos, or get_repos are used
     # only allow --start and --end if no repos or ignore are given
+    start_no = 1 
+    end_no = len(repos)
     if repos_process is None:
         start_no = args.start if args.start is not None else 1
         end_no = args.end if args.end is not None else len(repos)
