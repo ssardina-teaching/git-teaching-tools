@@ -260,7 +260,7 @@ if __name__ == "__main__":
     # 1. If output CSV file already exists, then we will extend it with the new commits
     #   for each repo, we get its latest commit date into dictionary latest_commits
     commits_previous_csv = []
-    latest_commits = {}
+    latest_commits = {} # track latest commit date for each repo processed
     if os.path.exists(csv_file):
         logger.info(
             f"Author file *{args.CSV_OUT}* exists. Extending it with the new commits: "
@@ -337,11 +337,11 @@ if __name__ == "__main__":
             commit_data["REPO"] = repo_id
 
     # 4. flatten the commit data into a list of commit dicts (each will carry its repo id now)
-    #  and sort by repo id first, then author.
+    #  and sort list of commits: repo, author, date commit
     commits_csv = commits_previous_csv
     for x in repos_commits.values():  # list containing lists of commits
         commits_csv.extend(x)  # flatten the list of lists
-    commits_csv.sort(key=lambda x: (x["REPO"], x["AUTHOR"]))
+    commits_csv.sort(key=lambda x: (x["REPO"].lower(), x["AUTHOR"].lower(), x["DATE"]))
 
     # 5. Now we build the aggregated stats for each author in each repo
     #  we build a list of dicts with the following fields:
@@ -371,12 +371,13 @@ if __name__ == "__main__":
                     "DELETIONS": no_deletions,
                 }
             )
+    author_stats_cvs.sort(
+        key=lambda x: (x["AUTHOR"].lower(), x["REPO"].lower())
+    )  # sort the list of teams
 
     # OK at this point we have two lists
     #   - commits_csv: all commits of all repos
     #   - author_stats_cvs: all authors stats of all repos
-
-    # done
 
     # 6. Finally, write two csv files: commit list, and aggregated contributions
     with open(csv_file, "w") as output_csv_file:
@@ -390,8 +391,14 @@ if __name__ == "__main__":
         csv_writer.writeheader()
         csv_writer.writerows(author_stats_cvs)
 
+    errors_csv.sort(key=lambda tup: tup["REPO"].lower())
     csv_error_file = csv_file.with_name(csv_file.stem + "_errors").with_suffix(".csv")
-    with open(csv_error_file, "w") as output_csv_file:
-        csv_writer = csv.DictWriter(output_csv_file, fieldnames=CSV_HEADER_ERRORS)
-        csv_writer.writeheader()
-        csv_writer.writerows(errors_csv)
+    file_exists = os.path.isfile(csv_error_file)
+    if file_exists or len(errors_csv) > 0:
+        with open(csv_error_file, "a") as output_csv_file:
+            csv_writer = csv.DictWriter(output_csv_file, fieldnames=CSV_HEADER_ERRORS)
+
+            # Write header only if file is new/empty
+            if not file_exists or os.path.getsize(csv_error_file) == 0:
+                csv_writer.writeheader()
+            csv_writer.writerows(errors_csv)
