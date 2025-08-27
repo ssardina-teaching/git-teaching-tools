@@ -33,6 +33,10 @@ REPOS_HEADER_CSV = [
 ]
 
 
+def timezone_time(*args):
+    return datetime.now(TIMEZONE).timetuple()
+
+
 def get_repos_from_csv(csv_file, repos_ids=None, ignore_ids=None) -> list[dict]:
     """
     Collect list of teams with their git URL links from a CSV file.

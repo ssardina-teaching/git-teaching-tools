@@ -80,6 +80,8 @@ import coloredlogs
 LOGGING_LEVEL = logging.INFO
 # LOGGING_LEVEL = logging.DEBUG
 # logging.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
+# Hook into logging
+logging.Formatter.converter = util.timezone_time
 logger = logging.getLogger(__name__)
 coloredlogs.install(
     logger=logger, level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE
@@ -90,6 +92,9 @@ coloredlogs.install(
 #####################################
 CSV_ERRORS = "pr_comment_errors.csv"
 CSV_ERRORS_HEADER = ["REPO_ID_SUFFIX", "REPO_URL", "ERROR"]
+
+CSV_POSTED = "pr_comment.csv"
+CSV_POSTED_HEADER = ["REPO_ID_SUFFIX", "REPO_URL", "STATUS"]
 
 SLEEP_RATE = 10  # number of repos to process before sleeping
 SLEEP_TIME = 5  # sleep time in seconds between API calls
@@ -305,7 +310,8 @@ if __name__ == "__main__":
     ###############################################
     authors_stats = []
     no_repos = len(repos)
-    errors = []
+    errors_csv = []
+    posted_csv = []
     for k, r in enumerate(repos):
         if k % SLEEP_RATE == 0 and k > 0:
             logger.info(f"Sleep for {SLEEP_TIME} seconds...")
@@ -336,7 +342,7 @@ if __name__ == "__main__":
                         break
                 if pr_feedback is None:
                     logger.error("\t Feedback PR not found! Skipping...")
-                    errors.append([repo_id, repo_url, "Feedback PR not found"])
+                    errors_csv.append([repo_id, repo_url, "Feedback PR not found"])
                     continue
             logger.debug(f"\t Feedback PR found: {pr_feedback}")
 
@@ -345,16 +351,18 @@ if __name__ == "__main__":
                 logger.error(
                     f"\t Repo {repo_id} not found in marking dictionary! Skipping..."
                 )
-                errors.append([repo_id, repo_url, "missing_marking"])
+                errors_csv.append([repo_id, repo_url, "missing_marking"])
                 continue
             marking_repo = marking_dict[repo_id]
 
             # First, should we skip submission it for any reason?
             # (e.g., no certification/submission/marking, audit)
-            message, skip = check_submission(repo_id, marking_repo, logger)
+            message, skip, skip_reason = check_submission(repo_id, marking_repo, logger)
             if message is not None:
                 issue_feedback_comment(pr_feedback, message, args.dry_run)
                 logger.info(f"\t Feedback warning/error posted to {pr_feedback.html_url}.")
+                if not args.dry_run:
+                    posted_csv.append([repo_id, repo_url, skip_reason])
             if skip:
                 continue
 
@@ -386,7 +394,7 @@ if __name__ == "__main__":
                     logger.error(
                         f"\t Error in repo {repo_name}: report {file_report} (or _ERROR) not found."
                     )
-                    errors.append([repo_id, repo_url, "Report not found"])
+                    errors_csv.append([repo_id, repo_url, "Report not found"])
                     continue
                 if os.stat(file_report).st_size > 50000:
                     logger.warning(f"\t Too large automarker report to publish")
@@ -415,21 +423,31 @@ if __name__ == "__main__":
                     issue_feedback_comment(pr_feedback, message, args.dry_run)
 
             logger.info(f"\t Feedback comment/report posted to {pr_feedback.html_url}.")
+            if not args.dry_run:
+                posted_csv.append([repo_id, repo_url, "OK"])
+
         except GithubException as e:
             logger.error(f"\t Error in repo {repo_name}: {e}")
-            errors.append([repo_id, repo_url, e])
+            errors_csv.append([repo_id, repo_url, e])
         except Exception as e:
             logger.error(
                 f"\t Unknown error in repo {repo_name}: {e} \n {traceback.format_exc()}"
             )
-            errors.append([repo_id, repo_url, e])
+            errors_csv.append([repo_id, repo_url, e])
 
-    logger.info(f"Finished! Total repos: {no_repos} - Errors: {len(errors)}.")
+    logger.info(f"Finished! Total repos: {no_repos} - Errors: {len(errors_csv)}.")
 
     add_csv(
         CSV_ERRORS,
         CSV_ERRORS_HEADER,
-        errors,
+        errors_csv,
+        append=True,
+        timestamp=NOW_TXT,
+    )  # write the errors to a CSV file
+    add_csv(
+        CSV_POSTED,
+        CSV_POSTED_HEADER,
+        posted_csv,
         append=True,
         timestamp=NOW_TXT,
     )  # write the errors to a CSV file
