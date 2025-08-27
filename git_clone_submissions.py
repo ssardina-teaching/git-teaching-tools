@@ -73,6 +73,7 @@ import coloredlogs
 LOGGING_LEVEL = logging.INFO
 # LOGGING_LEVEL = logger.DEBUG
 # logger.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
+logging.Formatter.converter = util.timezone_time
 logger = logging.getLogger(__name__)
 coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
 
