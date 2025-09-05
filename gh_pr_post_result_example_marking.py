@@ -1,140 +1,124 @@
 import logging
 
-# GH emoticons: https://gist.github.com/rxaviers/7360908
-
-# feedback message just after automarker report
-FEEDBACK_MESSAGE = r"""
+HEADER__TEXT = ""
+HEADER__TEXT = "This has been remarked to account for missing information in the previous marking.\n"
+FEEDBACK_MESSAGE = """
 
 -------------------------
-Your code has been automarked for technical correctness and the feedback report is shown above! ☝️ 
+Your code has been automarked for technical correctness and your grades are now preliminary registered!
 
-As you can see, we’ve crafted a comprehensive set of unit tests to evaluate your code, each with its own description. 😉
+Please note the following:
 
-The tests are grouped into separate suites corresponding to each question (e.g., db_link, route_ground, etc.). Each suite contains a different number of individual test cases, usually numbered for reference. These tests are designed to assess the correctness of your solution.
+- We will be running code similarity checks, as well as inspecting reports and code manually, in an ongoing basis for all the projects. We reserve the right to adjust the marks or to have a demo meeting with you, if necessary.
+- The total points above is raw and does not reflect the weighting of each question (as per spec.).
 
-Some test cases award points, while others (with scores between -1 and 0) apply a penalty — for example, a score of -0.2 indicates a 20% deduction from the points you’ve earned in that suite.
+Thanks for your submission & hope you enjoyed and learnt from this Pacman Search project!
 
-You will see that some exercises have been splitted into different test suites, for example, the routing predicates have been divided into two suites. Nonetheless, the marks/weights still sum up to original one for the exercise. 👍
-
-The final score (marks) for each suite is based on the total points collected after applying any penalties. The marks are out of 100. A **lot of effort went into designing this system**, and we hope you’ll find it useful as you review your work.
-
-> [!NOTE]
-> This is just the automarking part. The final assessment and summary is posted below in a table. 👇
+Sebastian
 """
+PROJECT_NO = 1
+TOTAL_POINTS = 38  # as per spec weighting of points (not raw automarking points, which may be larger)
+NO_COMMITS_EXPECTED = 13
+FIXED_SUBMISSION_MESSAGE = "The fixed submission must be done before **August 29th, 12pm**; no more extensions will be granted after that."
 
-TOTAL_POINTS = 100
 FEEDBACK_ENABLED = False
 FEEDBACK_ENABLED = True
 
+FINAL_MARKING = False
+
+
+def just_left(s: str) -> str:
+    """Justify string s to the left within width."""
+    return '<div align="left">' + s + "</div>"
+
+
 def report_feedback(marking):
-    # if mapping["NOTE-FEEDBACK"]:
-    #     mapping["NOTE-FEEDBACK"] = "**" + mapping["NOTE-FEEDBACK"] + "**"
-
-    # no feedback if not enabled
-    if not FEEDBACK_ENABLED:
-        return None
-
     # join all the "NOTE-XXXX" fields into a single string
-    feedback = ". ".join(
-        [marking[x] for x in marking.keys() if "NOTE-" in x and marking[x] != ""]
-    )
+    feedback = "<br>".join([marking[x] for x in marking.keys() if "NOTE-" in x])
 
     # round float values to 2 decimal places
     for k in marking.keys():
         if type(marking[k]) == float:
             marking[k] = round(marking[k], 2)
 
-    return f"""Train Network FEEDBACK & RESULTS 💬
+    return f"""Project {PROJECT_NO} FEEDBACK & RESULTS 💬
 ===========
-
-Here is the full summary of your submission, with feedback & marks:
-
+{HEADER__TEXT}
 |                                          |                             |
 |:-----------------------------------------|----------------------------:|
-|**Student number:**                         | {int(marking['STUDENT NO'])} |
+|**Student number:**                         | {marking['STUDENT NO']} |
 |**Student full name:**                      | {marking['Preferred Name']} |
 |**Github user:**                            | {marking['GHU']} |
+|**Git repo:**                               | {marking['URL-REPO']} |
 |**Timestamp submission:**                   | {marking['TIMESTAMP']} |
 |**Commit marked:**                          | {marking['COMMIT']} |
-|**No of commits done:**                     | {marking['SE-COM']} |
-|**No of commits expected (low number):**    | {marking['SE-EXCOM']} |
+|**No of commits:**                          | {marking['SE-NOCOM']} |
 |**Commit ratio (<1 signal problems)**       | {marking['SE-RATIO']} |
-|**Days late (if any):**                     | {marking['DYS-LATE']} |
+|**Days late tag (if any):**                 | {marking['DYS-LATE']} |
 |**Certified?**                              | {marking['CERTIFICATION']} |
+|**Days late certification (if any)**        | {marking['LATE-CERT']} |
 
 **NOTE:** Commit ratio is calculated pro-rata to the points achieved. 
     
 ## Raw points 🔎
-|**Raw points (earned / out of):**      | {marking['TOTAL-PTS']}  | {TOTAL_POINTS} |
+|**Raw points (earned / out of):**      | {marking['RPOINTS']}  | {TOTAL_POINTS} |
 |:--------------------------------------|-----------------------|---:|
-|**Exercise 1:**                        | {marking['TEX1']}    | 5  |
-|**Exercise 2:**                        | {marking['TEX2']}    | 5  |
-|**Exercise 3:**                        | {marking['TEX3']}    | 35 |
-|**Exercise 4:**                        | {marking['TEX4']}    | 30  |
-|**Exercise 5:**                        | {marking['TEX5']}    | 25 |
+|**Q1:**                                | {marking['Q1T']}      | 3  |
+|**Q2:**                                | {marking['Q2T']}      | 3  |
+|**Q3:**                                | {marking['Q3T']}      | 3  |
+|**Q4:**                                | {marking['Q4T']}      | 3  |
+|**Q5:**                                | {marking['Q5T']}      | 3  |
+|**Q6:**                                | {marking['Q6T']}      | 3  |
+|**Q7:**                                | {marking['Q7T']}      | 5  |
+|**Q8:**                                | {marking['Q8T']}      | 3  |
+|**Q9:**                                | {marking['Q9T']}      | 8  |
+|**Q10:**                               | {marking['Q10T']}     | 4  |
+
     
-## Development Quality (discount) weights (if any) 🕵🏽‍♂️
-|**Level of problem (if any):**             | {marking['SE-STATUS']} |
+## Software Engineering (SE) (discount) weights (if any) 🕵🏽‍♂️
+|**Issues?**                                | {marking['SE-STATUS']} |
 |:------------------------------------------|---------------------:|
-|**Merged feedback PR:**                    | {marking['SE-MERGE']} |
-|**Forced push:**                           | {marking['SE-FORCE']} |
-|**Commits with invalid username:**         | {marking['SE-GHU']} |
+|**Bad/late tagging:**                      | {marking['SE-TAG']} |
+|**Merged feedback PR:**                    | {marking['SE-PRMER']} |
+|**Forced push:**                           | {marking['SE-FORCED']} |
+|**Commits with invalid username:**         | {marking['SE-GHUSR']} |
 |**Printout side-effects (debug code?):**   | {marking['SE-LARGE']} |
-|**Commit number/process:**                 | {marking['SE-LRATIO']} |
-|**Other quality issues:**                  | {marking['SE-OTHER']} |
-|**Issues with development?:**              | {marking['SE-STATUS']} |
+|**Commit number/process:**                 | {marking['SE-LOWRAT']} |
+|**Other quality issues:**                  | {marking['SE-OTHR']} |
     
 ## Summary of results 🏁
-| -----------------------------------------------------  |                       |
+| .{"    "*22}.    |                       |
 |:------------------------------------------|----------------------:|
-|**Raw points (out of {TOTAL_POINTS}):**    | {marking['TOTAL-PTS']}  |
-|**Raw marks (out of 100):**                | {marking['MARKS-RAW']} |
-|**Marks adjustments (if any):**            | {marking['MARKS-ADJ']} |
-|**Late penalty marks (10/day, if any):**   | {marking['MARKS-LATE']} |
-|**Development weight adjustment (if any):**| {marking['WEIGHT-SE']} |
-|**Other weight adjustments (if any):**     | {marking['WEIGHT-OT']} |
-|**Total weight (1, if none):**             | {marking['WEIGHT']} |
-|**FINAL MARKS (out of 100):**              | **{marking['MARKS-F']}** |
-|**FINAL GRADE**                            | **{marking['GRADE']}** |
-|**General feedback:**                      | {marking['FEEDBACK']}|
-|**Marking feedback report:**               | See comment before :-)|
-|**Additional notes, observations**         | {feedback} |
+|**Raw points collected:**                  | {marking['RPOINTS']}  |
+|**Other discount weight (if any):**        | {marking['WEIGHT-M']}   |
+|**Total weight adjustment <br> (1 if none; read below):**   | {marking['WEIGHT']}   |
+|**Final points (out of {TOTAL_POINTS}):**  | {marking['POINTS']}  |
+|**Raw marks (out of 100):**                | {marking['RAW-MARKS']}    |
+|**Late penalty (10/day, if any):**         | {marking['LATE-PEN']} |
+|**Final marks (out of 100):**              | **{marking['MARKS']}**    |
+|**Grade:**                                 | **{marking['GRADE']}**    |
+|**Grade feedback:**                        | {just_left(marking['FEEDBACK'])}    |
+|**Feedback report:**                       | See comment before :-)|
+|**Feedback, notes, observations (if any)** | {just_left(feedback)}      |
+|**Other feedback (if any)**                | {just_left(marking['MANUAL-FEEDBACK'])} |
 
-The final marks (out of 100) is calculated as follows:
 
-* **FINAL MARKS** = (Raw Marks + Marks Adjustments + Late Adjustments) * Total Weight
-* Total Weight is between 0 and 1; with 1 if no adjustments.
+The final marks (out of 100) is calculated as follows: 📱
 
-As we explained in class, each unit test is judged on soundness (-70% if fails soundness), completeness (90%), and non-redundant answers (10%). 
+* **RAW MARKS** = ((RAW_POINTS / TOTAL_POINTS)*TOTAL_WEIGHT_ADJUSTMENT)*100
+* **FINAL MARKS** = RAW MARKS - LATE PENALTY
 
-Detailed explanation of the marking and report can be found in [HERE](https://github.com/RMIT-COSC2780-2973-IDM25/IDM25-DOC/blob/main/MARKING-TRAIN.md). Also refer to post [#57](https://edstem.org/au/courses/22051/discussion/2596224) and [#58](https://edstem.org/au/courses/22051/discussion/2596515) for more details on the marking process and overall results.
+For more information on marking scheme, refer to post [#224](https://edstem.org/au/courses/25332/discussion/2880419).
 
-**Hope the above feedback is clear and detailed.** 🤞
+Hope the above feedback is clear and detailed🤞, but if you spot any factual error in the marking or you really need clarification (after carefully analysing the feedback), please **post HERE in this PR** 👇🏾: _do not send email or make posts in the forum_.
 
-Remember the SE/GIT development aims to have minimal **evidence of the process towards the solution in your development**. The expected commits is a bare minimum that serves as _proxy_ to signal a problem, not an aim in itself (that is why it is so low). As a reference, the average number of commits was around 30, and submissions that achieved high-scores (85+) had 50+ commits. We used a **very low bound of 15 commits** for a _perfect solution_ (pro-rata on points achieved); less than sugests problem with development.  ✔️
-
-This concludes the assessment.
-
-🙏 Thanks for your submission & hope you enjoyed and learnt from this project! 🙏
-
-**Sebastian**
-
-> [!WARNING]
-> **Please do not send emails or post about your submission or results on the forum**. Only questions, challenges, or comments posted below in this pull request 👇 will be considered.
-> 
-> Your message must include clear evidence that you have thoroughly reviewed the report and your solution. Submissions that do not demonstrate thoughtful analysis will be ignored.
+Remember the SE/GIT development aims to have minimal **evidence of the process towards the solution in your development**. The expected commits is a bare minimum that serves as _proxy_ to signal a problem, not an aim in itself (that is why it is so low). For this project, we used a **very low bound of {NO_COMMITS_EXPECTED} commits** for a _perfect solution_ (pro-rata on points achieved); less than strongly suggests problem with development.
 
 Sebastian
 """
 
 
-# def no_tag_feedback(mapping):
-#     return f"""Project 2 FEEDBACK & RESULTS
-
-# https://github.com/RMIT-COSC1127-1125-AI24/AI24-DOC/blob/main/FAQ-PROJECTS.md#i-submitted-wrongly-eg-didnt-tag-correctly-and-is-now-after-the-due-date-can-you-consider-my-submission💬
-
-
-def check_submission(repo_id: str, marking: dict, logger: logging.Logger):
+def check_submission(repo_id: str, marking_repo: dict, logger: logging.Logger):
     """Checks on the submission for the repo_id and returns a message and a skip flag, if applicable.
 
     The markign_repo is the row in the marking spreadsheet and may contain columns that signal problems with the submission.
@@ -142,20 +126,55 @@ def check_submission(repo_id: str, marking: dict, logger: logging.Logger):
     """
     message = None
     skip = False
-    if not marking["COMMIT"]:
-        logger.warning(f"\t Repo {repo_id} has no tag submission.")
-        message = (
-            f"Dear @{repo_id}: no submission tag found; no marking as per spec. :cry:"
-        )
-        message = f"Dear @{repo_id}: no submission tag found, so nothing to mark. :cry: If you still want to submit (albeit with a discount), [check this](https://tinyurl.com/22r4j6t8)."
-        skip = True
-    elif marking["CERTIFICATION"].upper() != "YES":
-        logger.warning(f"\t Repo {repo_id} has no certification.")
-        message = f"Dear @{repo_id}: no certification found; no marking as per spec. :cry: If you still want to submit with an existing commit, please fill certification and let us know in this PR; we will remark it, albeit with a discount late penalty (certification is in the submission instructions and has been discussed a lot)."
-        skip = True
-    elif "SKIP" in marking and marking["SKIP"]:
+    skip_reason = ""
+
+    # by defeault, do not skip, but any of the cases below will skip
+    if marking_repo["SKIP"]:
         logger.warning(
-            f"\t Repo {repo_id} is flagged to be SKIPPED...: {marking['SKIP']}"
+            f"\t Repo {repo_id} is flagged to be SKIPPED...: {marking_repo['SKIP']}"
         )
         skip = True
-    return message, skip
+        skip_reason = "skip flag"
+        return message, skip, skip_reason
+
+    if marking_repo["DROPPED"]:
+        logger.warning(f"\t Repo {repo_id} is DROPPED...: {marking_repo['DROPPED']}")
+        message = f"Dear @{repo_id}: you seem to not be enrolled in the course anymore, so no marking is performed. If this is an error, please let us know here. Otherwise, all the best!"
+        skip = True
+        skip_reason = "dropped_flag"
+        return message, skip, skip_reason
+
+    if FINAL_MARKING:
+        # no more chances...
+        if not marking_repo["COMMIT"] or marking_repo["CERTIFICATION"].upper() != "YES":
+            logger.warning(
+                f"\t Repo {repo_id} has no tag submission and no certification!"
+            )
+            message = f"Dear @{repo_id}: incorrect or missing submission. No submission tag and/or no certification done; no marking as per spec. :cry: Please use this as a useful feedback and learning opportunity and submit correctly for next projects. "
+            skip = True
+            skip_reason = "no_commit_or_cert"
+        return message, skip, skip_reason
+    else:
+        if (
+            not marking_repo["COMMIT"]
+            and marking_repo["CERTIFICATION"].upper() != "YES"
+        ):
+            logger.warning(
+                f"\t Repo {repo_id} has no tag submission and no certification!"
+            )
+            message = f"Dear @{repo_id}: no submission tag and no certification found, so nothing to mark. :cry: If you still want to submit (albeit with a discount), [check this](https://tinyurl.com/29h2on8k). All this was discussed a lot, including at lectorial; refer to slides. {FIXED_SUBMISSION_MESSAGE}"
+            skip = True
+            skip_reason = "no_commit_and_cert"
+        if not marking_repo["COMMIT"]:
+            logger.warning(f"\t Repo {repo_id} has no tag submission.")
+            message = f"Dear @{repo_id}: no submission tag found, so nothing to mark. :cry: If you still want to submit (albeit with a discount), [check this](https://tinyurl.com/29h2on8k). Note this was discussed a lot, including at lectorial; refer to slides. {FIXED_SUBMISSION_MESSAGE}"
+            skip = True
+            skip_reason = "no_commit"
+        elif marking_repo["CERTIFICATION"].upper() != "YES":
+            logger.warning(f"\t Repo {repo_id} has no certification.")
+            message = f"Dear @{repo_id}: no certification found; no marking as per spec. :cry: If you still want to submit (albeit with a discount), please fill certification ASAP. Certification is in the submission instructions and has been discussed a lot, including at lectorials. {FIXED_SUBMISSION_MESSAGE}"
+            skip = True
+            skip_reason = "no_cert"
+        return message, skip, skip_reason
+
+    # should never get here
