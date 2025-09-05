@@ -28,6 +28,7 @@ Feel free to use them as desired. No guarantees and I am sure they will have bug
     - [`ghc_build_reporter.py`: build YAML classroom reporter](#ghc_build_reporterpy-build-yaml-classroom-reporter)
     - [`gh_user_access.py`: get repos and accesses of org](#gh_user_accesspy-get-repos-and-accesses-of-org)
     - [`gh_issue_labels.py`: get/update issue labels in a GH repo](#gh_issue_labelspy-getupdate-issue-labels-in-a-gh-repo)
+    - [`gh_refresh_invite.sh`: Refresh pending repo invitations](#gh_refresh_invitesh-refresh-pending-repo-invitations)
   - [Git Tools](#git-tools)
     - [`git_clone_submissions.py`: batch git cloning](#git_clone_submissionspy-batch-git-cloning)
     - [`git_batch_commit.sh`: bulk commit and push to repos](#git_batch_commitsh-bulk-commit-and-push-to-repos)
@@ -300,6 +301,22 @@ $ python gh_issue_labels.py get harry-honours-2025/honours-software -t jasdlakjs
 # push completely the set of labels
 $ python gh_issue_labels.py push harry-honours-2025/honours-software -tf  ~/.ssh/keys/gh-token-ssardina.txt --file labels.json --replace
 ```
+
+### `gh_refresh_invite.sh`: Refresh pending repo invitations
+
+When using GitHub Classroom, seems some students get the repo created but have no access and their invites do not work. They are still showing as "pending invitation". There is an discssion on this [here](https://github.com/orgs/community/discussions/72283). It seems the problem is that GitHub Classroom invitations expire _before_ students can accept them 😕. While we all hope GitHub resolves this soon, I built a temporary workaround that has already helped our students regain access quickly.
+
+The suggestion is to refresh the invitation: delete and re-invite. Doing it manual (for many students) become time consuming, so the script `gh_refresh_invite.sh` allows to quickly do the refresh.
+
+The script is a bash script and requires install and authettication of [GitHub CLI](https://github.com/cli/cli?tab=readme-ov-file). Then you can run:
+
+```shell
+$ refresh_invite.sh RMIT-COSC1127-3117-AI25 p2-prolog-garimlaw
+Processing invitation for user: garimlaw
+  -> Deleting invitation ID 291199199 from RMIT-COSC1127-3117-AI25/p2-prolog-garimlaw...
+  -> Re-creating invitation for user: garimlaw
+```
+
 
 ## Git Tools
 
