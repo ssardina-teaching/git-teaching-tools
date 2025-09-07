@@ -9,6 +9,11 @@
 #     -> Deleting invitation ID 291175054 from RMIT-COSC1127-3117-AI25/p2-prolog-s3952879...
 #     -> Re-creating invitation for user: s3952879
 #   
+#  Others have proposed diffrent solutions:
+#    A website to request invites: 
+#       https://github.com/Ygilany/github-reinvite
+#    A web-hook to auto-reinvite on delete:
+#       https://github.com/nikmomo/GHClassroom.AccessFix
 
 ##### GET OPTIONS FROM COMMAND-LINE
 NO_ARGS=$#   # Get the number of arguments passed in the command line
