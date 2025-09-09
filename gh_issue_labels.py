@@ -13,11 +13,20 @@ Library uses REST API: https://docs.github.com/en/rest
 Some usage help on PyGithub:
     https://www.thepythoncode.com/article/using-github-api-in-python
 
+Issue: https://github.com/ssardina-teaching/git-teaching-tools/issues/23
+
 Example:
 
     $ python gh_issue_labels.py get harry-honours-2025/honours-software -t jasdlakjsdlj1223d --file labels.json
 
     $ python gh_issue_labels.py push harry-honours-2025/honours-software -tf  ~/.ssh/keys/gh-token-ssardina.txt --file labels.json --replace
+
+In the ends, this is doing something equivalent to:
+
+    $ curl -X POST -H "Authorization: token YOUR_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    https://api.github.com/repos/YOUR_ORG/YOUR_REPO/labels \
+    -d '{"name":"bug", "color":"d73a4a", "description":"Something is not working"}'
 """
 
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com + ChatGPT friend"
