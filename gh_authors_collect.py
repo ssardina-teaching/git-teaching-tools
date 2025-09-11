@@ -23,6 +23,7 @@ import time
 import os
 
 from argparse import ArgumentParser
+import traceback
 from typing import List
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
@@ -152,7 +153,17 @@ def get_commits(
 
     # c is <class 'github.Commit.Commit'> https://pygithub.readthedocs.io/en/latest/github_objects/Commit.html
     for c in repo_commits:
-        author = c.author.login if c.author else f"name({c.commit.author.name})"
+        # had to put a try (Sept 2025) as it throws  github.GithubException.IncompletableObject
+        # on this repo: https://github.com/RMIT-COSC1127-3117-AI25/p1-search-Yoghiii/
+        try:
+            if c.author is not None:
+                author = c.author.login if c.author else f"name({c.commit.author.name})"
+            else:
+                author = f"name({c.commit.author.name})"
+        except GithubException as e:
+            logger.error(f"Error getting author for commit: {e}")
+            # traceback.print_exc()
+            author = f"name({c.commit.author.name})"
 
         if author in IGNORE_USERS:
             continue
