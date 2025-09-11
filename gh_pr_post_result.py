@@ -119,6 +119,7 @@ def load_marking_dict(file_path: str, col_key="GHU") -> dict:
     df.dropna(subset=[col_key], inplace=True)
     df.drop_duplicates(subset=[col_key], keep="last", inplace=True)
     df = df.replace(np.nan, "")
+    df[col_key] = df[col_key].str.lower()   # set the key column to lower case
     df.set_index(col_key, inplace=True)
     df = df.round(2)
     comment_dict = df.to_dict(orient="index")
@@ -347,6 +348,8 @@ if __name__ == "__main__":
             logger.debug(f"\t Feedback PR found: {pr_feedback}")
 
             # get the marking data for the student/repo
+            print(repo_id)
+            print(sorted(marking_dict.keys()))
             if repo_id not in marking_dict:
                 logger.error(
                     f"\t Repo {repo_id} not found in marking dictionary! Skipping..."
