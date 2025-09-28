@@ -31,15 +31,13 @@ from util import (
     LOGGING_FMT,
     GH_HTTP_URL_PREFIX,
 )
+SCRIPT_NAME = os.path.basename(__file__)
 
 import logging
-import coloredlogs
-LOGGING_LEVEL = logging.INFO
-# LOGGING_LEVEL = logger.DEBUG
-# logger.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
-logging.Formatter.converter = util.timezone_time
-logger = logging.getLogger(__name__)
-coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
+from slogger import setup_logging
+logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)
+logger.setLevel(logging.INFO)  # set the level of the application logger
+logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
 CSV_GITHUB_USERNAME = "github_username"
 CSV_GITHUB_IDENTIFIER = "identifier"
@@ -69,8 +67,8 @@ if __name__ == "__main__":
         f"student ids ({CSV_GITHUB_IDENTIFIER}).",
     )
     args = parser.parse_args()
-    print(args)
-    print(f"Running the script on: {util.get_time_now()}", flush=True)
+    logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
+    logger.info(args, depth=1)
 
     REPO_URL_PATTERN = re.compile(
         r"^{}/{}-(.*)$".format(args.ORG_NAME, args.REPO_ID_PREFIX)

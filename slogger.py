@@ -26,6 +26,7 @@ Some information on Python logging and this logger:
 
 We can create a logger with empty handlers, propagation, and a console hanlder in root:
 
+    import logging
     from slogger import setup_logging
     logger = setup_logging("pyNBL", rotating_file="pynbl.log", indent=2)
     logger.setLevel(logging.INFO)  # set the level of the application logger
@@ -78,20 +79,23 @@ LOG_RECORD_BUILTIN_ATTRS = {
 
 # FORMATTING with identation!
 #   https://docs.python.org/3/library/logging.html#logrecord-attributes
-DEFAULT_LOG_FMT = "  %(log_color)s%(asctime)s [%(name)s] %(levelname)-8s%(reset)s | %(indent)s%(log_color)s%(message)s%(reset)s"
+DEFAULT_LOG_FMT = "  %(log_color)s%(asctime)s [%(name)s] %(levelname)-4s%(reset)s | %(indent)s%(log_color)s%(message)s%(reset)s"
 LOG_FMT_SIMPLE = (
-    "%(log_color)s[%(name)s] %(levelname)-8s%(reset)s | %(indent)s%(message)s%(reset)s"
+    "%(log_color)s[%(name)s] %(levelname)-4s%(reset)s | %(indent)s%(message)s%(reset)s"
 )
 LOG_FMT_SUPER_SIMPLE = (
-    "%(log_color)s %(levelname)-8s%(reset)s | %(indent)s%(message)s%(reset)s"
+    "%(log_color)s %(levelname)-4s%(reset)s | %(indent)s%(message)s%(reset)s"
 )
 LOG_DATE = "%Y-%m-%dT%H:%M:%S%z"
 DEFAULT_LOG_COLORS = {
     "DEBUG": "cyan",
+    "DEBG": "cyan",
     "INFO": "green",
     "WARNING": "yellow",
+    "WARN": "yellow",
     "ERROR": "red",
-    "CRITICAL": "bold_red",
+    "ERR": "red",
+    "CRIT": "bold_red",
 }
 # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 DEFAULT_TIMEZONE_STR = "Australia/Melbourne"
@@ -108,12 +112,12 @@ def setRootLoggerLevel(level):
 
 
 def setup_logging(
-    name_logger: str = "ssardina",
-    fmt=DEFAULT_LOG_FMT,
-    timezone=DEFAULT_TIMEZONE,
-    datefmt=LOG_DATE,
-    colors=DEFAULT_LOG_COLORS,
-    indent=2,
+    name_logger: str = "app",
+    fmt: str=DEFAULT_LOG_FMT,
+    timezone: ZoneInfo=DEFAULT_TIMEZONE,
+    datefmt: str=LOG_DATE,
+    colors: dict=DEFAULT_LOG_COLORS,
+    indent: int=2,
     level=logging.INFO,
     rotating_file=None
 ) -> logging.Logger:
@@ -203,11 +207,18 @@ class IndentColorFormatter(ColoredFormatter):
         - colored formatter
         - llows setting a timezone for reporting dates and times
     """
+    SHORT_LEVELS = {
+        "WARNING": "WARN",
+        "ERROR": "ERR",
+        "CRITICAL": "CRIT",
+        "DEBUG": "DEBG",
+    }
     def __init__(self, *args, timezone=None, indent=2, **kwargs):
         super().__init__(*args, **kwargs)
         self.timezone = timezone
         self.indent = indent
 
+    # alternative 1: add the indent to the message itself!
     # @override
     # def format(self, record):
     #     depth = getattr(record, "depth", 0)
@@ -215,8 +226,12 @@ class IndentColorFormatter(ColoredFormatter):
     #     record.message = f"{indent}{record.getMessage()}"  # Add indent
     #     return super().format(record)
 
+    # alternative 2: add the indent as data to the record
     @override
     def format(self, record):
+        print(record.levelname)
+        if record.levelname in self.SHORT_LEVELS:
+            record.levelname = self.SHORT_LEVELS[record.levelname]
         record.indent = " " * self.indent * getattr(record, "depth", 0)
         return super().format(record)
 
