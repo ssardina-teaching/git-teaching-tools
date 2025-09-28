@@ -46,6 +46,9 @@ import argparse
 import csv
 import time
 import traceback
+# https://gitpython.readthedocs.io/en/stable/reference.html
+# http://gitpython.readthedocs.io/en/stable/tutorial.html
+import git
 
 # local utilities
 import util
@@ -60,22 +63,24 @@ from util import (
     LOGGING_FMT,
     GH_HTTP_URL_PREFIX,
 )
+SCRIPT_NAME = "git_clone"
 
-
-# https://gitpython.readthedocs.io/en/stable/reference.html
-# http://gitpython.readthedocs.io/en/stable/tutorial.html
-import git
 
 # from git import Repo, Git
 
 import logging
-import coloredlogs
-LOGGING_LEVEL = logging.INFO
-# LOGGING_LEVEL = logger.DEBUG
-# logger.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
-logging.Formatter.converter = util.timezone_time
-logger = logging.getLogger(__name__)
-coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
+# import coloredlogs
+# LOGGING_LEVEL = logging.INFO
+# # LOGGING_LEVEL = logger.DEBUG
+# # logger.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
+# logging.Formatter.converter = util.timezone_time
+# logger = logging.getLogger(__name__)
+# coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
+
+from slogger import setup_logging
+logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
+logger.setLevel(logging.INFO)  # set the level of the application logger
+logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
 TIMESTAMP_HEADER_CSV = [
         "repo",
@@ -126,21 +131,21 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
         if not os.path.exists(
             repo_local_dir
         ):  # if there is NOT already a local repo for the team - clone from scratch!
-            logger.info(f"\t Trying to clone NEW team repo from URL {repo_git_url}.")
+            logger.info(f"Trying to clone NEW team repo from URL {repo_git_url}.", depth=1)
             try:
                 repo = git.Repo.clone_from(repo_git_url, repo_local_dir, branch=tag)
                 new_commit_time, new_commit, new_tagged_time = util.get_tag_info(
                     repo, tag_str="head"
                 )
                 logger.info(
-                    f"\t Repo {repo_name} cloned successfully with tag date {new_commit_time}."
+                    f"Repo {repo_name} cloned successfully with tag date {new_commit_time}.", depth=1
                 )
                 repos_new.append(repo_name)
                 status = "new"
             except git.GitCommandError as e:
                 repos_missing.append(repo_name)
                 logger.warning(
-                    f"Repo {repo_name} with tag/branch {tag} cannot be cloned: {e.stderr}"
+                    f"Repo {repo_name} with tag/branch {tag} cannot be cloned: {e.stderr}", depth=1
                 )
                 continue
             except KeyboardInterrupt:
@@ -150,7 +155,7 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
                 sys.exit("keyboard interrupted!")
             except TypeError as e:
                 logger.warning(
-                    f"Repo {repo_name} was cloned but has no tag {tag}, removing it...: {e}"
+                    f"Repo {repo_name} was cloned but has no tag {tag}, removing it...: {e}", depth=1
                 )
                 repo.close()
                 shutil.rmtree(repo_local_dir)
@@ -158,7 +163,7 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
                 continue
             except Exception as e:
                 logger.error(
-                    f"Repo {repo_name} cloned but unknown error when getting tag {tag}; should not happen. Stopping... {e}"
+                    f"Repo {repo_name} cloned but unknown error when getting tag {tag}; should not happen. Stopping... {e}", depth=1
                 )
                 repo.close()
                 exit(1)
@@ -173,7 +178,7 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
                 local_commit_time, _, _ = util.get_tag_info(repo, tag_str="head")
 
                 logger.info(
-                    f"\t Existing LOCAL submission for {repo_name} dated {local_commit_time} ({str(repo.commit())[:7]}); updating it..."
+                    f"Existing LOCAL submission for {repo_name} dated {local_commit_time} ({str(repo.commit())[:7]}); updating it...", depth=1
                 )
 
                 # Next, first fetch from remote all tags and new commits
@@ -196,7 +201,7 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
                     ):  # tag has been deleted! remove local repo, no more submission
                         repos_missing.append(repo_name)
                         logger.info(
-                            f"No tag {tag} in the repository for team {repo_name} anymore; removing it..."
+                            f"No tag {tag} in the repository for team {repo_name} anymore; removing it...", depth=1
                         )
                         repo.close()
                         shutil.rmtree(repo_local_dir)
@@ -205,24 +210,24 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
                     repo.git.checkout(tag)
 
                 logger.debug(
-                    f"Tag *{tag}* seen in in commit {str(new_commit)[:7]} ({new_commit_time}) tagged on {new_tagged_time}"
+                    f"Tag *{tag}* seen in in commit {str(new_commit)[:7]} ({new_commit_time}) tagged on {new_tagged_time}", depth=1
                 )
 
                 # Now process timestamp to report new or unchanged repo
                 if new_commit_time == local_commit_time:
-                    logger.info(f"Team {repo_name} submission has not changed.")
+                    logger.info(f"Team {repo_name} submission has not changed.", depth=1)
                     repos_unchanged.append(repo_name)
                     status = "unchanged"
                 else:
                     logger.info(
-                        f"Team {repo_name} updated successfully with new tag date {new_commit_time}"
+                        f"Team {repo_name} updated successfully with new tag date {new_commit_time}", depth=1
                     )
                     repos_updated.append(repo_name)
                     status = "updated"
             except git.GitCommandError as e:
                 repos_missing.append(repo_name)
                 logger.warning(
-                    f"Problem with existing Repo {repo_name}; removing it: {e} - {e.stderr}"
+                    f"Problem with existing Repo {repo_name}; removing it: {e} - {e.stderr}", depth=1
                 )
                 print("\n")
                 repo.close()
@@ -239,7 +244,7 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
 
                 repos_missing.append(repo_name)
                 logger.warning(
-                    f"\t Local repo {repo_local_dir} is problematic; removing it..."
+                    f"\t Local repo {repo_local_dir} is problematic; removing it...", depth=1
                 )
                 print(traceback.print_exc())
                 print("\n")
@@ -326,7 +331,8 @@ if __name__ == "__main__":
     )
     # we could also use vars(parser.parse_args()) to make args a dictionary args['<option>']
     args = parser.parse_args()
-    logger.info(f"Starting script on {TIMEZONE}: {NOW_ISO} - {args}")
+    logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
+    logger.info(args, depth=1)
 
     ###############################################
     # Validation checks
