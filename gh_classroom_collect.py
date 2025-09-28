@@ -38,6 +38,8 @@ from slogger import setup_logging
 logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)
 logger.setLevel(logging.INFO)  # set the level of the application logger
 logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
+
+
 CSV_GITHUB_USERNAME = "github_username"
 CSV_GITHUB_IDENTIFIER = "identifier"
 
@@ -67,6 +69,8 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
+    logger.info(args, depth=1)
+
 
     REPO_URL_PATTERN = re.compile(
         r"^{}/{}-(.*)$".format(args.ORG_NAME, args.REPO_ID_PREFIX)

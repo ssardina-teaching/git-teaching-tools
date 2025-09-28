@@ -19,11 +19,8 @@ import csv
 from datetime import datetime
 from pathlib import Path
 import time
-
 import os
-
 from argparse import ArgumentParser
-import traceback
 from typing import List
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
@@ -44,14 +41,13 @@ from util import (
     DATE_FORMAT,
 )
 
-import logging
-import coloredlogs
+SCRIPT_NAME = os.path.basename(__file__)
 
-LOGGING_LEVEL = logging.INFO
-# LOGGING_LEVEL = logger.DEBUG
-# logger.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
-logger = logging.getLogger(__name__)
-coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
+import logging
+from slogger import setup_logging
+logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)
+logger.setLevel(logging.INFO)  # set the level of the application logger
+logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
 
 CSV_HEADER = [
@@ -231,8 +227,9 @@ if __name__ == "__main__":
         help="Use GitHub contribution to main stats (Default: %(default)s).",
     )
     args = parser.parse_args()
-    logger.info(f"Starting on {TIMEZONE}: {NOW_ISO} - {args}")
-
+    logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
+    logger.info(args, depth=1)
+    
     csv_file = Path(args.CSV_OUT)
 
     ###############################################
@@ -323,14 +320,14 @@ if __name__ == "__main__":
                 repo, since=since_date, sha=args.tag, length_msg=50
             )
         except Exception as e:
-            logger.info(f"\t Exception repo {repo_suffix}: {e}")
+            logger.info(f"Exception repo {repo_suffix}: {e}", depth=1)
             errors_csv.append({"REPO": repo_id, "ERROR": e})
             continue
 
         no_commits = len(repos_commits[repo_suffix])
         authors = set([c["AUTHOR"] for c in repos_commits[repo_suffix]])
         logger.info(
-            f"\t Repo {repo_suffix} has {no_commits} commits from {len(authors)} authors: {authors}."
+            f"Repo {repo_suffix} has {no_commits} commits from {len(authors)} authors: {authors}.", depth=1
         )
 
     # At this point, repos_commits dictionary has all commits of all repos.
