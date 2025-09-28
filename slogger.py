@@ -229,7 +229,6 @@ class IndentColorFormatter(ColoredFormatter):
     # alternative 2: add the indent as data to the record
     @override
     def format(self, record):
-        print(record.levelname)
         if record.levelname in self.SHORT_LEVELS:
             record.levelname = self.SHORT_LEVELS[record.levelname]
         record.indent = " " * self.indent * getattr(record, "depth", 0)
