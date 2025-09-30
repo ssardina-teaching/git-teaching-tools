@@ -5,7 +5,7 @@ Check correctness of Feedback PR:
     - has it been wrongly merged?
     - has there been a forced pushed reported?
 
-This is useful to handle teh Feedeback PRs #1 from GitHub Classroom, where students are supposed to fix their code
+This is useful to handle the Feedeback PRs #1 from GitHub Classroom, where students are supposed to fix their code
 
 Uses PyGithub (https://github.com/PyGithub/PyGithub) as API to GitHub:
 
@@ -19,6 +19,7 @@ __copyright__ = "Copyright 2024-2025"
 
 import csv
 from argparse import ArgumentParser
+import os
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Github, Repository, Organization, GithubException
@@ -35,15 +36,13 @@ from util import (
     GH_HTTP_URL_PREFIX,
     backup_file
 )
-
+SCRIPT_NAME = os.path.basename(__file__)
 
 import logging
-import coloredlogs
-LOGGING_LEVEL = logging.INFO
-# LOGGING_LEVEL = logging.DEBUG
-# logger.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
-logger = logging.getLogger(__name__)
-coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
+from slogger import setup_logging
+logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)
+logger.setLevel(logging.INFO)  # set the level of the application logger
+logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
 
 # Application global variables
@@ -65,7 +64,8 @@ if __name__ == "__main__":
     parser.add_argument("--no", type=int, help="number of the PR to merge.")
     parser.add_argument("--title", help="title of PR to merge.")
     args = parser.parse_args()
-    logger.info(f"Starting on {TIMEZONE}: {NOW_ISO} - {args}")
+    logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
+    logger.info(args, depth=1)
 
     if args.no is None and args.title is None:
         logger.error("You must provide a PR number or title to merge.")
@@ -114,7 +114,7 @@ if __name__ == "__main__":
             if args.no is not None:
                 if prs.totalCount < args.no:
                     logger.error(
-                        f"\t No PR with number {args.no} - Repo has only {prs.totalCount} PRs."
+                        f"No PR with number {args.no} - Repo has only {prs.totalCount} PRs.", depth=1
                     )
                     rows_csv.append([row, repo_name, "", "missing", args.no])
                     continue
@@ -122,32 +122,32 @@ if __name__ == "__main__":
                     pr_selected = repo.get_pull(args.no)
             else:
                 for pr in prs:
-                    logger.debug(f"\t PR: {pr.number} - {pr.title}")
+                    logger.debug(f"PR: {pr.number} - {pr.title}", depth=1)
                     if args.title in pr.title:
                         pr_selected = pr
                         break
                 if pr_selected is None:
-                    logger.error(f"\t No PR containing '{args.title}' in title.")
+                    logger.error(f"No PR containing '{args.title}' in title.", depth=1)
                     rows_csv.append([row, repo_name, "", "missing", args.title])
                     continue
-            logger.info(f"\t Found relevant PR: {pr_selected}")
+            logger.info(f"Found relevant PR: {pr_selected}", depth=1)
 
             if pr_selected.merged:
                 pr_url = f"{repo_url}/pull/{pr_selected.number}"
-                logger.warning(f"\t PR Feedback merged!!! {pr_selected} - URL: {pr_url}")
+                logger.warning(f"PR Feedback merged!!! {pr_selected} - URL: {pr_url}", depth=1)
                 rows_csv.append([row, repo_name, pr_url, "merged", ""])
 
             # check for forced push
             for event in pr_selected.get_issue_events():
                 if event.event == "head_ref_force_pushed":
                     pr_url = f"{repo_url}/pull/{pr_selected.number}"
-                    logger.warning(f"\t PR Feedback forcec pushed!!! {pr_selected} - actor: {event.actor} - URL: {pr_url}")
+                    logger.warning(f"PR Feedback forcec pushed!!! {pr_selected} - actor: {event.actor} - URL: {pr_url}", depth=1)
                     rows_csv.append(
                         [row, repo_name, pr_url, "push_forced", event.actor]
                     )
                     break
         except GithubException as e:
-            logger.error(f"\t Error in repo {repo_name}: {e}")
+            logger.error(f"Error in repo {repo_name}: {e}", depth=1)
             rows_csv.append([row, repo_name, pr_url, "error", e])
 
     logger.info(

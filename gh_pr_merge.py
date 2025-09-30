@@ -16,6 +16,7 @@ __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2019-2023"
 
 from argparse import ArgumentParser
+import os
 from typing import List
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
@@ -33,11 +34,13 @@ from util import (
 )
 from datetime import datetime
 
+SCRIPT_NAME = os.path.basename(__file__)
 import logging
-import coloredlogs
-LOGGING_LEVEL = logging.INFO
-# logging.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
-coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
+from slogger import setup_logging
+logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)
+logger.setLevel(logging.INFO)  # set the level of the application logger
+logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
+
 
 
 if __name__ == "__main__":
@@ -57,8 +60,8 @@ if __name__ == "__main__":
         help="File containing GitHub authorization token/password.",
     )
     args = parser.parse_args()
-
-    logging.info(f"Starting on {TIMEZONE}: {NOW_ISO}\n")
+    logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
+    logger.info(args, depth=1)
 
     if args.no is None and args.title is None:
         logging.error("You must provide a PR number or title to merge.")
@@ -111,7 +114,7 @@ if __name__ == "__main__":
         if args.no is not None:
             if prs.totalCount < args.no:
                 logging.error(
-                    f"\t No PR with number {args.no} - Repo has only {prs.totalCount} PRs."
+                    f"No PR with number {args.no} - Repo has only {prs.totalCount} PRs.", depth=1
                 )
                 exit(1)
             else:
@@ -122,26 +125,26 @@ if __name__ == "__main__":
                     pr_selected = pr
                     break
             if pr_selected is None:
-                logging.warning(f"\t No PR containing '{args.title}' in title.")
+                logging.warning(f"No PR containing '{args.title}' in title.", depth=1)
                 continue
 
-        logging.info(f"\t Found relevant PR: {pr_selected}")
+        logging.info(f"Found relevant PR: {pr_selected}", depth=1)
 
         if pr_selected.merged:
-            logging.info("\t PR already merged.")
+            logging.info("PR already merged.", depth=1)
             continue
 
-        logging.info(f"\t PR is still not merged - will try to merge it: {pr_selected}")
+        logging.info(f"PR is still not merged - will try to merge it: {pr_selected}", depth=1)
         try:
             status = pr_selected.merge(merge_method="merge")
             if status.merged:
-                logging.info("\t Successful merging...")
+                logging.info("Successful merging...", depth=1)
                 no_merged += 1
             else:
-                logging.error(f"\t MERGING DIDN'T WORK - STATUS: {status}")
+                logging.error(f"MERGING DIDN'T WORK - STATUS: {status}", depth=1)
                 no_errors += 1
         except GithubException as e:
-            logging.error(f"\t MERGING FAILED WITH EXCEPTION: {e}")
+            logging.error(f"MERGING FAILED WITH EXCEPTION: {e}", depth=1)
             no_errors += 1
 
     logging.info(
