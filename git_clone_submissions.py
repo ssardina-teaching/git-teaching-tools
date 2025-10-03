@@ -99,24 +99,19 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
 
     :param list_repos: a dictionary mapping team names to git-urls
     :param tag_str: the tag to grab
-    :return: the following information as a tuple:
-         repos_cloned : teams that were successfully cloned
-         repos_new: teams that are new
-         repos_updated: teams that were there and got a new version in the tag
-         repos_unchanged: teams that were there but with the same tag version
-         repos_missing: teams that where not cloned
+    :return: 
+        repos_status: dictionary with repo status list (cloned, new, updated, deleted, etc)
     """
     no_repos = len(repos)
     repos.sort(key=lambda tup: tup["REPO_ID_SUFFIX"].lower())  # sort the list of teams
 
     logger.info(f"About to clone {no_repos} repo teams into folder {output_folder}/.")
-    repos_new = []
-    repos_missing = []
-    repos_unchanged = []
-    repos_updated = []
-    repos_cloned = []
-    repos_notag = []
-    repos_noteam = []
+    
+    # keep track of various set of repos    
+    repos_status = dict()
+    for status in ["cloned", "new", "missing", "updated", "unchanged", "cloned", "notag", "noteam", "deleted"]:
+        repos_status[status] = []
+
     for k, row in enumerate(repos, start=1):
         repo_no = row["NO"]
         repo_http_url = row["REPO_HTTP"]
@@ -140,10 +135,10 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
                 logger.info(
                     f"Repo {repo_name} cloned successfully with tag date {new_commit_time}.", depth=1
                 )
-                repos_new.append(repo_name)
+                repos_status["new"].append(repo_name)
                 status = "new"
             except git.GitCommandError as e:
-                repos_missing.append(repo_name)
+                repos_status["missing"].append(repo_name)
                 logger.warning(
                     f"Repo {repo_name} with tag/branch {tag} cannot be cloned: {e.stderr}", depth=1
                 )
@@ -159,7 +154,8 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
                 )
                 repo.close()
                 shutil.rmtree(repo_local_dir)
-                repos_notag.append(repo_name)
+                repos_status["notag"].append(repo_name)
+                repos_status["deleted"].append(repo_name)
                 continue
             except Exception as e:
                 logger.error(
@@ -196,11 +192,10 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
                     new_commit_time, new_commit, new_tagged_time = util.get_tag_info(
                         repo, tag
                     )
-                    if (
-                        new_commit_time is None
-                    ):  # tag has been deleted! remove local repo, no more submission
-                        repos_missing.append(repo_name)
-                        logger.info(
+                    if new_commit_time is None:
+                        # tag has been deleted! remove local repo, no more submission
+                        repos_status["deleted"].append(repo_name)
+                        logger.warning(
                             f"No tag {tag} in the repository for team {repo_name} anymore; removing it...", depth=1
                         )
                         repo.close()
@@ -216,16 +211,16 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
                 # Now process timestamp to report new or unchanged repo
                 if new_commit_time == local_commit_time:
                     logger.info(f"Team {repo_name} submission has not changed.", depth=1)
-                    repos_unchanged.append(repo_name)
+                    repos_status["unchanged"].append(repo_name)
                     status = "unchanged"
                 else:
                     logger.info(
                         f"Team {repo_name} updated successfully with new tag date {new_commit_time}", depth=1
                     )
-                    repos_updated.append(repo_name)
+                    repos_status["updated"].append(repo_name)
                     status = "updated"
             except git.GitCommandError as e:
-                repos_missing.append(repo_name)
+                repos_status["missing"].append(repo_name)
                 logger.warning(
                     f"Problem with existing Repo {repo_name}; removing it: {e} - {e.stderr}", depth=1
                 )
@@ -242,7 +237,7 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
                 print(traceback.print_exc())
                 exit(1)
 
-                repos_missing.append(repo_name)
+                repos_status["missing"].append(repo_name)
                 logger.warning(
                     f"\t Local repo {repo_local_dir} is problematic; removing it...", depth=1
                 )
@@ -263,7 +258,7 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
             )  # get the no of commits tracing to the tag
         repo.close()
         # Finally, write teams that have repos (new/updated/unchanged) into submission timestamp file
-        repos_cloned.append(
+        repos_status["cloned"].append(
             {
                 "repo": repo_name,
                 "submitted_at": new_commit_time.strftime(util.DATE_FORMAT),
@@ -276,15 +271,7 @@ def clone_team_repos(repos:list, tag:str, output_folder:str):
         )
 
     # the end....
-    return (
-        repos_cloned,
-        repos_new,
-        repos_updated,
-        repos_unchanged,
-        repos_missing,
-        repos_notag,
-        repos_noteam,
-    )
+    return repos_status
 
 
 def report_teams(type, teams):
@@ -361,15 +348,7 @@ if __name__ == "__main__":
         exit(0)
 
     # Perform the ACTUAL CLONING of all teams in list_teams
-    (
-        repos_cloned,
-        repos_new,
-        repos_updated,
-        repos_unchanged,
-        repos_missing,
-        repos_notag,
-        repos_noteam,
-    ) = clone_team_repos(repos, args.TAG, args.OUTPUT_FOLDER)
+    repos_status = clone_team_repos(repos, args.TAG, args.OUTPUT_FOLDER)
 
     # Write the submission timestamp file
     logger.warning("Producing timestamp csv file...")
@@ -400,14 +379,15 @@ if __name__ == "__main__":
                     submission_writer.writerow(row)
 
         # dump all the teams that have been cloned into the CSV timestamp file
-        submission_writer.writerows(repos_cloned)
+        submission_writer.writerows(repos_status['cloned'])
 
     # produce report of what was cloned
     print("\n ============================================== \n")
-    report_teams("NEW TEAMS", repos_new)
-    report_teams("UPDATED TEAMS", repos_updated)
-    report_teams("UNCHANGED TEAMS", repos_unchanged)
-    report_teams("TEAMS MISSING (or not cloned successfully)", repos_missing)
-    report_teams("TEAMS WITH NO TAG", repos_notag)
-    report_teams("REPOS WITH NO TEAM", repos_noteam)
+    report_teams("NEW TEAMS", repos_status["new"])
+    report_teams("UPDATED TEAMS", repos_status["updated"])
+    report_teams("UNCHANGED TEAMS", repos_status["unchanged"])
+    report_teams("TEAMS DELETED (where there but not now)", repos_status["deleted"])
+    report_teams("TEAMS MISSING (or not cloned successfully)", repos_status["missing"])
+    report_teams("TEAMS WITH NO TAG", repos_status["notag"])
+    report_teams("REPOS WITH NO TEAM", repos_status["noteam"])
     print("\n ============================================== \n")
