@@ -153,7 +153,7 @@ if __name__ == "__main__":
         help="if given, only the teams specified will be parsed (Default: %(default)s).",
     )
     parser.add_argument(
-        "--start",
+        "--start",  
         "-s",
         type=int,
         default=1,
