@@ -23,12 +23,13 @@ The script requires:
 2. a CSV file with the marking information (e.g., GHU, GH suffix, marks, feedback, etc.)
 3. a Python file with the report builder configuration
 3. [OPTIONAL] a folder with the automarker reports to be posted
+4. The GH authorization token/password file (-t)
 
 Example:
 
-$ python gh_pr_post_result.py -t ~/.ssh/keys/gh-token-ssardina.txt --repos s3975993 repos.csv marking.csv pr_message.py reports |& tee -a pr_feedback.log
-
-The report builder (file pr_message.py in the example) must define the following functions:
+$ python ../tools/git-teaching-tools.git/gh_pr_post_result.py repos.csv marking.csv feedback_p2.py reports -t ~/.ssh/keys/gh-token-ssardina.txt --repos ssardina
+ 
+The feedback builder (file pr_message.py in the example) must define the following functions:
 
 - report_feedback(mapping): function to generate the feedback message
 - check_submission(repo_id, mapping, logger): function to check if the repo should be processed
@@ -37,11 +38,7 @@ The report builder (file pr_message.py in the example) must define the following
 
 The `mapping` is a dictionary with the marking information for the repo, representing one row of the CSV file.
 
-See files
-    gh_pr_post_result_example_marking.py
-    gh_pr_post_result_example_message.py
-
-for examples on message builders
+For example on feedback builders see feedback_p2.py in this folder
 """
 __author__ = "Sebastian Sardina & Andrew Chester - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2024-2025"
@@ -242,8 +239,8 @@ if __name__ == "__main__":
     sys.modules["module_name"] = module_feedback
 
     # these MUST be defined in the report builder
-    FEEDBACK_MESSAGE = getattr(module_feedback, "FEEDBACK_MESSAGE")
-    report_feedback = getattr(module_feedback, "report_feedback")
+    FEEDBACK_REPORT = getattr(module_feedback, "FEEDBACK_REPORT")
+    result_feedback = getattr(module_feedback, "result_feedback")
     check_submission = getattr(module_feedback, "check_submission")
 
     #  feedback file may say which repos to process
@@ -403,12 +400,12 @@ if __name__ == "__main__":
                     message = f"# Feedback Report ✅\n\n ```{args.extension}\n{report_text}```"
                     if error_text is not None:
                         message += f"\n**NOTE**: {error_text}"
-                    message += f"\n{FEEDBACK_MESSAGE}"
+                    message += f"\n{FEEDBACK_REPORT}"
                     issue_feedback_comment(pr_feedback, message, args.dry_run)
 
             # Second, create COMMENT with the feedback summary
             if not args.no_feedback:
-                feedback_text = report_feedback(marking_repo)
+                feedback_text = result_feedback(marking_repo)
                 if feedback_text is not None:
                     message = f"Dear @{repo_id}: find here the FEEDBACK & RESULTS for the project. \n\n {feedback_text}"
                     message = feedback_text
