@@ -18,7 +18,6 @@ $ python gh_pr_post_comment.py -t ~/.ssh/keys/gh-token-ssardina.txt repos.csv me
 
 message.py should have a string constant MESSAGE
 """
-
 __author__ = "Sebastian Sardina & Andrew Chester - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2024-2025"
 import csv
@@ -45,16 +44,17 @@ from util import (
     LOGGING_DATE,
     LOGGING_FMT,
 )
+SCRIPT_NAME = "git_post_comment"
 
 import logging
-import coloredlogs
-LOGGING_LEVEL = logging.INFO
-# LOGGING_LEVEL = logging.DEBUG
-# logging.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
-logger = logging.getLogger(__name__)
-coloredlogs.install(
-    logger=logger, level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE
-)
+from slogger import setup_logging
+logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
+logger.setLevel(logging.INFO)  # set the level of the application logger
+logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
+
+#####################################
+# LOCAL GLOBAL VARIABLES FOR SCRIPT
+#####################################
 
 SLEEP_RATE = 10  # number of repos to process before sleeping
 SLEEP_TIME = 5  # sleep time in seconds between API calls
@@ -108,8 +108,8 @@ if __name__ == "__main__":
         help="Do not push to repos, just report on console %(default)s.",
     )
     args = parser.parse_args()
-    print(args)
-    logger.info(f"Starting on {TIMEZONE}: {NOW_ISO}")
+    logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
+    logger.info(args, depth=1)
 
     if not os.path.isfile(args.REPO_CSV):
         logger.error(f"Repo CSV file {args.REPO_CSV} not found.")
@@ -192,7 +192,7 @@ if __name__ == "__main__":
                 for pr in repo.get_pulls():
                     if pr.title == "Feedback":
                         logger.warning(
-                            f"\t Feedback PR found in number {pr.number}! Using this one: {repo_url}/pull/{pr.number}"
+                            f"Feedback PR found in number {pr.number}! Using this one: {repo_url}/pull/{pr.number}", depth=1
                         )
                         pr_feedback = repo.get_issue(number=pr.number)
                         break
@@ -200,19 +200,19 @@ if __name__ == "__main__":
                     logger.error("\t Feedback PR not found! Skipping...")
                     errors.append([repo_id, repo_url, "Feedback PR not found"])
                     continue
-            logger.debug(f"\t Feedback PR found: {pr_feedback}")
+            logger.debug(f"Feedback PR found: {pr_feedback}", depth=1)
 
             issue_feedback_comment(
                 pr_feedback, MESSAGE.format(ghu=repo_id), args.dry_run
             )
             if not args.dry_run:
-                logger.info(f"\t Message posted to {pr_feedback.html_url}.")
+                logger.info(f"Message posted to {pr_feedback.html_url}.", depth=1)
         except GithubException as e:
-            logger.error(f"\t Error in repo {repo_name}: {e}")
+            logger.error(f"Error in repo {repo_name}: {e}", depth=1)
             errors.append([repo_id, repo_url, e])
         except Exception as e:
             logger.error(
-                f"\t Unknown error in repo {repo_name}: {e} \n {traceback.format_exc()}"
+                f"Unknown error in repo {repo_name}: {e} \n {traceback.format_exc()}", depth=1
             )
             errors.append([repo_id, repo_url, e])
 

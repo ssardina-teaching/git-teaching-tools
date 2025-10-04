@@ -65,23 +65,15 @@ from util import (
 )
 SCRIPT_NAME = "git_clone"
 
-
-# from git import Repo, Git
-
 import logging
-# import coloredlogs
-# LOGGING_LEVEL = logging.INFO
-# # LOGGING_LEVEL = logger.DEBUG
-# # logger.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
-# logging.Formatter.converter = util.timezone_time
-# logger = logging.getLogger(__name__)
-# coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
-
 from slogger import setup_logging
 logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
 logger.setLevel(logging.INFO)  # set the level of the application logger
 logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
+#####################################
+# LOCAL GLOBAL VARIABLES FOR SCRIPT
+#####################################
 TIMESTAMP_HEADER_CSV = [
         "repo",
         "submitted_at",
