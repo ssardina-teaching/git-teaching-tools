@@ -43,7 +43,6 @@ See files
 
 for examples on message builders
 """
-
 __author__ = "Sebastian Sardina & Andrew Chester - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2024-2025"
 import os
@@ -69,23 +68,14 @@ from util import (
     LOGGING_FMT,
     add_csv
 )
-
-# get the TIMEZONE to be used - works with Python < 3.9 via pytz and 3.9 via ZoneInfo
-TIMEZONE_STR = "Australia/Melbourne"
-TIMEZONE = ZoneInfo(TIMEZONE_STR)
+SCRIPT_NAME = "pr_post_result"
 
 import logging
-import coloredlogs
+from slogger import setup_logging
+logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
+logger.setLevel(logging.INFO)  # set the level of the application logger
+logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
-LOGGING_LEVEL = logging.INFO
-# LOGGING_LEVEL = logging.DEBUG
-# logging.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
-# Hook into logging
-logging.Formatter.converter = util.timezone_time
-logger = logging.getLogger(__name__)
-coloredlogs.install(
-    logger=logger, level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE
-)
 
 #####################################
 # LOCAL GLOBAL VARIABLES FOR SCRIPT
@@ -170,6 +160,7 @@ if __name__ == "__main__":
         help="repo no to start processing from (Default: %(default)s).",
     )
     parser.add_argument("--end", "-e", type=int, help="repo no to end processing.")
+    parser.add_argument("--batch", "-b", type=int, help="batch to post (column BATCH, if any).")
     parser.add_argument(
         "--extension",
         "-ext",
@@ -358,7 +349,7 @@ if __name__ == "__main__":
 
             # First, should we skip submission it for any reason?
             # (e.g., no certification/submission/marking, audit)
-            message, skip, skip_reason = check_submission(repo_id, marking_repo, logger)
+            message, skip, skip_reason = check_submission(repo_id, marking_repo, args.batch, logger)
             if message is not None:
                 issue_feedback_comment(pr_feedback, message, args.dry_run)
                 logger.info(f"\t Feedback warning/error posted to {pr_feedback.html_url}.")
