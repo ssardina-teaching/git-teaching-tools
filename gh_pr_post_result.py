@@ -157,7 +157,7 @@ if __name__ == "__main__":
         help="repo no to start processing from (Default: %(default)s).",
     )
     parser.add_argument("--end", "-e", type=int, help="repo no to end processing.")
-    parser.add_argument("--batch", "-b", type=int, help="batch to post (column BATCH, if any).")
+    parser.add_argument("--batch", "-b", help="batch to post (column BATCH, if any).")
     parser.add_argument(
         "--extension",
         "-ext",
@@ -277,6 +277,11 @@ if __name__ == "__main__":
     if len(repos) == 0:
         logger.error(f'No relevant repos found in the mapping file "{args.REPO_CSV}". Stopping.')
         exit(0)
+
+    # filter repos by batch if requested
+    repos = [r for r in repos if r["REPO_ID_SUFFIX"].lower() in marking_dict]
+    if args.batch is not None:
+        repos = [x for x in repos if marking_dict[x["REPO_ID_SUFFIX"].lower()]['BATCH'] == args.batch]
 
     logger.info(f"Number of relevant repos found: {len(repos)}")
 
