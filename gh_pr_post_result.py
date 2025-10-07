@@ -81,7 +81,7 @@ CSV_ERRORS = "pr_comment_errors.csv"
 CSV_ERRORS_HEADER = ["REPO_ID_SUFFIX", "REPO_URL", "ERROR"]
 
 CSV_POSTED = "pr_comment.csv"
-CSV_POSTED_HEADER = ["REPO_ID_SUFFIX", "REPO_URL", "STATUS"]
+CSV_POSTED_HEADER = ["REPO_ID_SUFFIX", "REPO_URL", "PR_URL", "STATUS"]
 
 SLEEP_RATE = 10  # number of repos to process before sleeping
 SLEEP_TIME = 5  # sleep time in seconds between API calls
@@ -239,7 +239,8 @@ if __name__ == "__main__":
     sys.modules["module_name"] = module_feedback
 
     # these MUST be defined in the report builder
-    FEEDBACK_REPORT = getattr(module_feedback, "FEEDBACK_REPORT")
+    FEEDBACK_REPORT_BEFORE = getattr(module_feedback, "FEEDBACK_REPORT_BEFORE")
+    FEEDBACK_REPORT_AFTER = getattr(module_feedback, "FEEDBACK_REPORT_AFTER")
     result_feedback = getattr(module_feedback, "result_feedback")
     check_submission = getattr(module_feedback, "check_submission")
 
@@ -356,7 +357,9 @@ if __name__ == "__main__":
                 issue_feedback_comment(pr_feedback, message, args.dry_run)
                 logger.info(f"\t Feedback warning/error posted to {pr_feedback.html_url}.")
                 if not args.dry_run:
-                    posted_csv.append([repo_id, repo_url, skip_reason])
+                    posted_csv.append(
+                        [repo_id, repo_url, pr_feedback.html_url, skip_reason]
+                    )
             if skip:
                 continue
 
@@ -402,10 +405,14 @@ if __name__ == "__main__":
                     with open(os.path.join(file_report), "r") as report:
                         report_text = report.read()
 
-                    message = f"# Feedback Report ✅\n\n ```{args.extension}\n{report_text}```"
+                    message = f"# Feedback Report ✅\n\n"
+                    if FEEDBACK_REPORT_BEFORE is not None:
+                        message += FEEDBACK_REPORT_BEFORE
+                    message += f"\n\n ```{args.extension}\n{report_text}```"
                     if error_text is not None:
                         message += f"\n**NOTE**: {error_text}"
-                    message += f"\n{FEEDBACK_REPORT}"
+                    if FEEDBACK_REPORT_AFTER is not None:
+                        message += f"\n{FEEDBACK_REPORT_AFTER}"
                     issue_feedback_comment(pr_feedback, message, args.dry_run)
 
             # Second, create COMMENT with the feedback summary
@@ -418,7 +425,7 @@ if __name__ == "__main__":
 
             logger.info(f"\t Feedback comment/report posted to {pr_feedback.html_url}.")
             if not args.dry_run:
-                posted_csv.append([repo_id, repo_url, "OK"])
+                posted_csv.append([repo_id, repo_url, pr_feedback.html_url, "OK"])
 
         except GithubException as e:
             logger.error(f"\t Error in repo {repo_name}: {e}")
