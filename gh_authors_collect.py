@@ -16,7 +16,7 @@ __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2019-2025"
 
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import time
 import os
@@ -61,7 +61,10 @@ CSV_HEADER = [
     "URL",
 ]
 CSV_HEADER_TYPE = {"DATE": datetime, "ADDITIONS": int, "DELETIONS": int}
-CSV_HEADER_STATS = ["REPO", "AUTHOR", "COMMITS", "ADDITIONS", "DELETIONS"]
+
+CSV_HEADER_STATS = ["REPO", "AUTHOR", "COMMITS", "ADDITIONS", "DELETIONS", "LAST"]
+CSV_HEADER_STATS_TYPE = {"LAST": datetime, "ADDITIONS": int, "DELETIONS": int}
+
 CSV_HEADER_ERRORS = ["REPO", "ERROR"]
 GH_URL_PREFIX = "https://github.com/"
 IGNORE_USERS = [
@@ -127,21 +130,20 @@ def get_commits(
     """
     repo_commits = set()
 
-    # first we get all the commits from all branches we care about
     if sha is not None:  # a particular branch/sha has been given
-        repo_commits = set(repo.get_commits(sha=sha))
+        repo_branches = [sha]
     else:
-        repo_branches = repo.get_branches()
-        for branch in repo_branches:
-            name_branch = branch.name
-            logger.debug("Processing branch: ", name_branch)
-            if since is not None:
-                branch_commits = list(repo.get_commits(sha=name_branch, since=since))
-            else:
-                branch_commits = list(repo.get_commits(sha=name_branch))
-            repo_commits = repo_commits.union(
-                branch_commits
-            )  # union bc there will be same shared sha commits
+        repo_branches = [b.name for b in repo.get_branches()]
+
+    for branch in repo_branches:
+        logger.debug("Processing branch: ", branch)
+        if since is not None:
+            branch_commits = list(repo.get_commits(sha=branch, since=since))
+        else:
+            branch_commits = list(repo.get_commits(sha=branch))
+        repo_commits = repo_commits.union(
+            branch_commits
+        )  # union bc there will be same shared sha commits
 
     # Now we have all commits in repo_commits, extract relevant data
     # we will collect all the commits in the repo here
@@ -284,6 +286,8 @@ if __name__ == "__main__":
                 if key in row:
                     row[key] = datetime.fromisoformat(row[key]) if cast == datetime else cast(row[key])
 
+        # extract the latest commit date for each repo (so we can gather from there on)
+        #TODO: eextract it from the stat file in column LAST that we now hve.
         for commits in commits_previous_csv:
             repo_id = commits["REPO"]
             if (
@@ -319,6 +323,7 @@ if __name__ == "__main__":
             repos_commits[repo_suffix] = get_commits(
                 repo, since=since_date, sha=args.tag, length_msg=50
             )
+            print(repos_commits[repo_suffix])
         except Exception as e:
             logger.info(f"Exception repo {repo_suffix}: {e}", depth=1)
             errors_csv.append({"REPO": repo_id, "ERROR": e})
@@ -369,6 +374,7 @@ if __name__ == "__main__":
             # get the total number of additions and deletions
             no_additions = sum([c["ADDITIONS"] for c in author_commits])
             no_deletions = sum([c["DELETIONS"] for c in author_commits])
+            last_commit_date = max([c["DATE"] for c in author_commits])
             # add to the list of authors stats
             author_stats_cvs.append(
                 {
@@ -377,6 +383,7 @@ if __name__ == "__main__":
                     "COMMITS": no_commits,
                     "ADDITIONS": no_additions,
                     "DELETIONS": no_deletions,
+                    "LAST": last_commit_date
                 }
             )
     author_stats_cvs.sort(
