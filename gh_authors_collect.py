@@ -323,7 +323,6 @@ if __name__ == "__main__":
             repos_commits[repo_suffix] = get_commits(
                 repo, since=since_date, sha=args.tag, length_msg=50
             )
-            print(repos_commits[repo_suffix])
         except Exception as e:
             logger.info(f"Exception repo {repo_suffix}: {e}", depth=1)
             errors_csv.append({"REPO": repo_id, "ERROR": e})
