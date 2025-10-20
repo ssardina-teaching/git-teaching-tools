@@ -1,19 +1,51 @@
 import logging
+from pathlib import Path
 
 
+#########################
+# CORE CONFIGURATION
+#########################
 FINAL_MARKING = False   # final marking, no more resubmissions
-HEADER_TEXT = ""
-# HEADER_TEXT = "This has been remarked to account for missing information in the previous marking.\n"
-
-# get the markdown message to post after the automarking report
-with open("feedback_p2_report.md", "r", encoding="utf-8") as f:
-    FEEDBACK_REPORT = f.read()
-
-PROJECT_NO = 2
-TOTAL_POINTS = 100   # as per spec weighting of points (not raw automarking points, which may be larger)
-NO_COMMITS_EXPECTED = 8  # very low bar
+PROJECT_NO = 3
+TOTAL_POINTS = 25   # as per spec weighting of points (sum of all question points, Q1+...+Qn)
+NO_COMMITS_EXPECTED = 11  # very low bar
 RESUBMIT_FAQ_LINK = "https://github.com/RMIT-COSC1127-3117-AI25/AI25-DOC/blob/main/FAQ-PROJECTS.md#i-submitted-wrongly-eg-didnt-tag-correctly-and-is-now-after-the-due-date-can-you-consider-my-submission"
-FIXED_SUBMISSION_MESSAGE = "The fixed submission must be done within 5 days of this messsage; no more extensions will be granted after that."
+FIXED_SUBMISSION_MESSAGE = "The fixed submission must be done **within 5 days of this messsage**; no more extensions will be granted after that. Do not send emails or post on the forum, any follow ups should be done in this PR 👇."
+
+# main feedback template in markdown format
+FILE_FEEDBACK="feedback_p3_marking.md"
+
+
+########################
+# OPTIONAL CONFIGURATION
+########################
+# optional text before and after automarking report
+FILE_FEEDBACK_REPORT_BEFORE="feedback_p3_report_before.md"
+FILE_FEEDBACK_REPORT_AFTER="feedback_p3_report_after.md"
+
+# default: NO MESSAGES BEFORE AND AFTER REPORT
+FILE_FEEDBACK_REPORT_BEFORE=None
+# FILE_FEEDBACK_REPORT_AFTER=None
+
+# HEADER_TEXT = "This has been remarked to account for missing information in the previous marking.\n"
+# HEADER_TEXT = "Well done, you did fantastic work in this project! 💯 🎉\n"
+# HEADER_TEXT = "Well done, you did fantastic work in this project!  🎉\n"
+
+HEADER_TEXT = ""
+
+if FILE_FEEDBACK_REPORT_BEFORE is not None and Path(FILE_FEEDBACK_REPORT_BEFORE).exists():
+    # get the markdown message to post after the automarking report
+    with open(FILE_FEEDBACK_REPORT_BEFORE, "r", encoding="utf-8") as f:
+        FEEDBACK_REPORT_BEFORE = f.read()
+else:
+    FEEDBACK_REPORT_BEFORE = "" # no remark information
+if FILE_FEEDBACK_REPORT_AFTER is not None and Path(FILE_FEEDBACK_REPORT_AFTER).exists():
+    with open(FILE_FEEDBACK_REPORT_AFTER, "r", encoding="utf-8") as f:
+        FEEDBACK_REPORT_AFTER = f.read()
+else:
+    FEEDBACK_REPORT_AFTER = "" # no remark information
+
+
 
 def just_left(s: str) -> str:
     """Justify string s to the left within width."""
@@ -38,7 +70,7 @@ def result_feedback(marking_row: dict):
             marking_row[k] = round(marking_row[k], 2)
             if marking_row[k].is_integer(): # drop decimals if none
                 marking_row[k] = int(marking_row[k])
-    with open("feedback_p2_marking.md", "r", encoding="utf-8") as f:
+    with open(FILE_FEEDBACK, "r", encoding="utf-8") as f:
         message = f.read()
     
     message = message.format(
@@ -94,7 +126,7 @@ def check_submission(repo_id: str, marking_row: dict, batch: None, logger: loggi
         if not marking_row["COMMIT"] or marking_row["CERTIFICATION"].upper() != "YES": 
             logger.warning(f"\t Repo {repo_id} has no tag submission and no certification!")
             message = (
-                f"Dear @{repo_id}: incorrect or missing submission. No submission tag and/or no certification done; no marking as per spec. :cry: Please use this as a useful feedback and learning opportunity and submit correctly for next projects. You are responsible of submitting correctly as specified."
+                f"❌ Dear @{repo_id}: incorrect or missing submission. No submission tag and/or no certification done; no marking as per spec. 😢 Please use this as a useful feedback and learning opportunity and submit correctly for next projects. You 🫵 are responsible of submitting correctly as specified."
             )
             skip = True
             skip_reason = "no_commit_or_cert"
@@ -102,17 +134,23 @@ def check_submission(repo_id: str, marking_row: dict, batch: None, logger: loggi
     else:
         if not marking_row["COMMIT"] and marking_row["CERTIFICATION"].upper() != "YES": 
             logger.warning(f"\t Repo {repo_id} has no tag submission and no certification!")
-            message = f"Dear @{repo_id}: no submission tag and no certification found, so nothing to mark. :cry: If you still want to submit (albeit with a discount), [check this]({RESUBMIT_FAQ_LINK}). All this was discussed a lot, including at lectorial; refer to slides. {FIXED_SUBMISSION_MESSAGE}"
+
+            message = f"❌ Dear @{repo_id}: no submission tag and no certification were found, so no marking can be provided as per the project specification. 😢 \n If you still wish to submit (albeit with discount penalty), please tag and complete the certification **as soon as possible**, [check this]({RESUBMIT_FAQ_LINK}). The tagging and certification were detailed in the submission instructions and have been discussed extensively, including during lectorials. {FIXED_SUBMISSION_MESSAGE}"
+
             skip = True
             skip_reason = "no_commit_and_cert"
         elif not marking_row["COMMIT"]:
             logger.warning(f"\t Repo {repo_id} has no tag submission.")
-            message = f"Dear @{repo_id}: no submission tag found, so nothing to mark. :cry: If you still want to submit (albeit with a discount), [check this]({RESUBMIT_FAQ_LINK}). Note this was discussed a lot, including at lectorial; refer to slides. {FIXED_SUBMISSION_MESSAGE}"
+
+            message = f"❌ Dear @{repo_id}: no submission tag was found, so no marking can be provided as per the project specification. 😢 \n If you still wish to submit (albeit with discount penalty), please tag **as soon as possible**, [check this]({RESUBMIT_FAQ_LINK}).  {FIXED_SUBMISSION_MESSAGE}"
+
             skip = True
             skip_reason = "no_commit"
         elif marking_row["CERTIFICATION"].upper() != "YES":
             logger.warning(f"\t Repo {repo_id} has no certification.")
-            message = f"Dear @{repo_id}: no certification found; no marking as per spec. :cry: If you still want to submit (albeit with a discount), please fill certification ASAP. Certification is in the submission instructions and has been discussed a lot, including at lectorials. {FIXED_SUBMISSION_MESSAGE}"
+            
+            message = f"❌ Dear @{repo_id}: no certification was found, so no marking can be provided as per the project specification. 😢 \n If you still wish to submit (albeit with discount penalty), please complete the certification **as soon as possible**. The certification is detailed in the submission instructions and has been discussed extensively, including during lectorials. {FIXED_SUBMISSION_MESSAGE}"
+            
             skip = True
             skip_reason = "no_cert"
         return message, skip, skip_reason
