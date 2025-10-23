@@ -25,6 +25,7 @@ Feel free to use them as desired. No guarantees and I am sure they will have bug
     - [`gh_pr_post_comment.py`: push a message to PRs](#gh_pr_post_commentpy-push-a-message-to-prs)
     - [`gh_workflow.py`: run automarking workflow](#gh_workflowpy-run-automarking-workflow)
     - [`gh_commit_after.py`: get commits after a date](#gh_commit_afterpy-get-commits-after-a-date)
+    - [`gh_tag_after.py`: get repos with a given task after a date](#gh_tag_afterpy-get-repos-with-a-given-task-after-a-date)
     - [`ghc_build_reporter.py`: build YAML classroom reporter](#ghc_build_reporterpy-build-yaml-classroom-reporter)
     - [`gh_user_access.py`: get repos and accesses of org](#gh_user_accesspy-get-repos-and-accesses-of-org)
     - [`gh_issue_labels.py`: get/update issue labels in a GH repo](#gh_issue_labelspy-getupdate-issue-labels-in-a-gh-repo)
@@ -232,6 +233,23 @@ python ../../tools/git-hw-submissions.git/gh_commits_after.py -t /home/ssardina/
 ```
 
 This was used to revert back to a previous commit before a deadline when the student has (illegally) push more changes after a deadline.
+
+### `gh_tag_after.py`: get repos with a given task after a date
+
+To get the repos that have tag commit after a given date:
+
+```shell
+$ python ./tools/git-teaching-tools.git/gh_tags_after.py repos.csv submission -t ~/.ssh/keys/gh-token-ssardina.txt --since 2025-10-15T23:00
+
+$ cat tags-repos-2025-10-23_21-35.csv
+REPO_ID_SUFFIX,TAG,COMMIT,DATE
+lanadavies,submission,5dbac2b,2025-10-19T21:30:33+11:00
+longcent,submission,5cd116c,2025-10-17T22:57:16+11:00
+pugdev17,submission,b0568af,2025-10-15T23:53:25+11:00
+rishabh-despacito,submission,0451595,2025-10-16T14:50:11+11:00
+```
+
+The we can just clone those ones in a special folder (e.g., late submissions after main marking has been done).
 
 ### `ghc_build_reporter.py`: build YAML classroom reporter
 
