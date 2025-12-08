@@ -28,7 +28,6 @@ In the ends, this is doing something equivalent to:
     https://api.github.com/repos/YOUR_ORG/YOUR_REPO/labels \
     -d '{"name":"bug", "color":"d73a4a", "description":"Something is not working"}'
 """
-
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com + ChatGPT friend"
 __copyright__ = "Copyright 2025"
 import sys

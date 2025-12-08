@@ -229,7 +229,7 @@ $ python gh_workflow.py -t ~/.ssh/keys/gh-token-ssardina.txt --name Autograding 
 To get the commits after a date (and the one just before):
 
 ```shell
-python ../../tools/git-hw-submissions.git/gh_commits_after.py -t /home/ssardina/.ssh/keys/gh-token-ssardina.txt  --ignore ssardina --since 2025-04-08T12:00 --repos minhphamhuy ssardina DeltaEchoVictor101  -- repos.csv
+$ python ../../tools/git-hw-submissions.git/gh_commits_after.py -t /home/ssardina/.ssh/keys/gh-token-ssardina.txt  --ignore ssardina --since 2025-04-08T12:00 --repos minhphamhuy ssardina DeltaEchoVictor101  -- repos.csv
 ```
 
 This was used to revert back to a previous commit before a deadline when the student has (illegally) push more changes after a deadline.

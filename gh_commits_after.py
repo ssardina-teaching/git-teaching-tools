@@ -23,8 +23,8 @@ __copyright__ = "Copyright 2024-2025"
 import csv
 from argparse import ArgumentParser
 import time
+from datetime import datetime
 import util
-
 from util import (
     TIMEZONE,
     UTC,
@@ -35,18 +35,15 @@ from util import (
     LOGGING_FMT,
     GH_HTTP_URL_PREFIX,
 )
-
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Github, Repository, Organization, GithubException, Workflow
-
-from datetime import datetime
-
 
 import logging
 import coloredlogs
 LOGGING_LEVEL = logging.INFO
 # LOGGING_LEVEL = logger.DEBUG
-# logger.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
+# logger.basicConfig(format=LOGGING_FMT, level= LOGGING_LEVEL, datefmt=LOGGING_DATE)
+logging.Formatter.converter = util.timezone_time
 logger = logging.getLogger(__name__)
 coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
 
