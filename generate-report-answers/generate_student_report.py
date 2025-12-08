@@ -82,7 +82,7 @@ def group_questions_by_exercise(question_columns):
     return sorted_exercises
 
 
-def generate_markdown_table(submissions_dict, headers, student_number, points_dict=None) -> str:
+def generate_markdown_table(submissions_dict, headers, student_number, points_dict=None, perfect_std=9999999) -> str:
     """Generate a markdown table with student answers for each question, grouped by exercise."""
 
     # Find the student's row
@@ -95,7 +95,7 @@ def generate_markdown_table(submissions_dict, headers, student_number, points_di
     points_row = points_dict.get(int(student_number)) if points_dict else None
 
     # Get the full marks row (student number 1111111) for total points reference
-    full_marks_row = points_dict.get(1111111) if points_dict else None
+    full_marks_row = points_dict.get(perfect_std) if points_dict else None
 
     # Get question columns
     question_columns = get_question_columns(headers)
@@ -228,6 +228,10 @@ if __name__ == "__main__":
     parser.add_argument('csv_file', help='Path to the CSV file with form submissions')
     parser.add_argument('student_number', help='Student number to search for')
     parser.add_argument('-p', '--points', help='Path to the CSV file with points (optional)')
+    parser.add_argument('-ps', '--perfect', 
+                        type=int,
+                        default=9999999,
+                        help='Number of perfect students (to get total points per question) Default: %(default)s')
     parser.add_argument('-o', '--output', help='Output file (optional, prints to stdout if not provided)')
     parser.add_argument('--pdf', action='store_true', help='Generate PDF output (requires markdown and weasyprint packages)')
     args = parser.parse_args()
@@ -242,7 +246,7 @@ if __name__ == "__main__":
         if args.points:
             points_dict, _ = load_submissions_dict(args.points)
 
-        markdown_output = generate_markdown_table(submissions_dict, headers, int(args.student_number), points_dict)
+        markdown_output = generate_markdown_table(submissions_dict, headers, int(args.student_number), points_dict=points_dict, perfect_std=args.perfect)
 
         if markdown_output is None:
             print(f"Student number {args.student_number} not found in the CSV file.")
