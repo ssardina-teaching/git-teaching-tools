@@ -8,6 +8,7 @@ python generate_student_answers.py <csv_file> <student_number>
 """
 
 import csv
+from pathlib import Path
 import sys
 import argparse
 import os
@@ -159,7 +160,7 @@ def generate_markdown_table(submissions_dict, headers, student_number, points_di
     return markdown
 
 
-def convert_to_pdf(markdown_content, pdf_path):
+def convert_to_pdf(markdown_content, pdf_path : Path):
     """Convert markdown content to PDF using weasyprint."""
     if not PDF_AVAILABLE:
         raise ImportError("PDF generation requires 'markdown' and 'weasyprint' packages. Install with: pip install markdown weasyprint")
@@ -226,16 +227,17 @@ def convert_to_pdf(markdown_content, pdf_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate markdown table with student answers from CSV')
     parser.add_argument('csv_file', help='Path to the CSV file with form submissions')
-    parser.add_argument('student_number', help='Student number to search for')
+    parser.add_argument('student_number', nargs='+', help='Student number(s) to search for (can specify multiple)')
+    parser.add_argument('report_folder', help='Folder to save reports')
     parser.add_argument('-p', '--points', help='Path to the CSV file with points (optional)')
-    parser.add_argument('-ps', '--perfect', 
+    parser.add_argument('-ps', '--perfect',
                         type=int,
                         default=9999999,
                         help='Number of perfect students (to get total points per question) Default: %(default)s')
-    parser.add_argument('-o', '--output', help='Output file (optional, prints to stdout if not provided)')
-    parser.add_argument('--pdf', action='store_true', help='Generate PDF output (requires markdown and weasyprint packages)')
     args = parser.parse_args()
     print(args)
+
+    root_dir = Path(args.report_folder)
 
     try:
         # Load CSV data once as dictionary
@@ -246,35 +248,32 @@ if __name__ == "__main__":
         if args.points:
             points_dict, _ = load_submissions_dict(args.points)
 
-        markdown_output = generate_markdown_table(submissions_dict, headers, int(args.student_number), points_dict=points_dict, perfect_std=args.perfect)
+        # Process each student number
+        n = len(args.student_number)
+        for i, student_num in enumerate(args.student_number):
+            print(f"===> Processing student number {i+1}/{n}: {student_num}")
+            try:
+                student_number = int(student_num)
+            except ValueError:
+                print(f"Error: Invalid student number '{student_num}'. Skipping.")
+                continue
 
-        if markdown_output is None:
-            print(f"Student number {args.student_number} not found in the CSV file.")
-            sys.exit(1)
+            markdown_output = generate_markdown_table(submissions_dict, headers, student_number, points_dict=points_dict, perfect_std=args.perfect)
 
-        if args.pdf:
-            # Generate PDF output
-            if args.output:
-                # Use provided output filename, change extension to .pdf if needed
-                pdf_path = args.output
-                if not pdf_path.lower().endswith('.pdf'):
-                    pdf_path = os.path.splitext(pdf_path)[0] + '.pdf'
-            else:
-                # Generate default PDF filename
-                pdf_path = f"student_{args.student_number}_answers.pdf"
+            if markdown_output is None:
+                print(f"Student number {student_number} not found in the CSV file. Skipping...")
+                continue
 
+            # Generate PDF report file
+            pdf_path = Path( root_dir / f"report_{student_number}.pdf")
             convert_to_pdf(markdown_output, pdf_path)
             print(f"PDF saved to {pdf_path}")
 
-        elif args.output:
-            # Generate markdown output
-            with open(args.output, 'w', encoding='utf-8') as f:
+            # Generate markdown report file
+            md_path = pdf_path.with_suffix(".md")
+            with open(md_path, 'w', encoding='utf-8') as f:
                 f.write(markdown_output)
-            print(f"Markdown table saved to {args.output}")
-        else:
-            # Print to stdout
-            print(markdown_output)
-
+            print(f"Markdown table saved to {md_path}")
     except FileNotFoundError:
         print(f"Error: File '{args.csv_file}' not found.")
         sys.exit(1)
