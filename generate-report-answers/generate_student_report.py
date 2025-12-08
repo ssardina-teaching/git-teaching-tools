@@ -82,7 +82,7 @@ def group_questions_by_exercise(question_columns):
     return sorted_exercises
 
 
-def generate_markdown_table(submissions_dict: dict, headers: list, student_number) -> str:
+def generate_markdown_table(submissions_dict, headers, student_number, points_dict=None) -> str:
     """Generate a markdown table with student answers for each question, grouped by exercise."""
 
     # Find the student's row
@@ -90,6 +90,12 @@ def generate_markdown_table(submissions_dict: dict, headers: list, student_numbe
 
     if not student_row:
         return None
+
+    # Find the points row if points_dict is provided
+    points_row = points_dict.get(int(student_number)) if points_dict else None
+
+    # Get the full marks row (student number 1111111) for total points reference
+    full_marks_row = points_dict.get(1111111) if points_dict else None
 
     # Get question columns
     question_columns = get_question_columns(headers)
@@ -114,9 +120,13 @@ def generate_markdown_table(submissions_dict: dict, headers: list, student_numbe
         # Add exercise header
         markdown += f"## Exercise {exercise_num[1:]} ({exercise_num})\n\n"
 
-        # Add table header
-        markdown += "| Question | Answer |\n"
-        markdown += "|----------|--------|\n"
+        # Add table header (include points column if points data is available)
+        if points_row:
+            markdown += "| Question | Answer | Points |\n"
+            markdown += "|----------|--------|--------|\n"
+        else:
+            markdown += "| Question | Answer |\n"
+            markdown += "|----------|--------|\n"
 
         # Add questions for this exercise
         for question_header, question_name in questions:
@@ -129,7 +139,20 @@ def generate_markdown_table(submissions_dict: dict, headers: list, student_numbe
             # Escape pipe characters in answers to avoid breaking the table
             answer = answer.replace('|', '\\|')
 
-            markdown += f"| {question_name} | {answer} |\n"
+            # Get points if available
+            if points_row:
+                student_pts = points_row.get(question_header, 'N/A')
+
+                points_display = f"{student_pts}"
+
+                # add total marks out of if available
+                if full_marks_row:
+                    total_points = full_marks_row.get(question_header, 'N/A')
+                    points_display += f" / {total_points}"
+
+                markdown += f"| {question_name} | {answer} | {points_display} |\n"
+            else:
+                markdown += f"| {question_name} | {answer} |\n"
 
         markdown += "\n"  # Add space between exercise tables
 
@@ -204,6 +227,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate markdown table with student answers from CSV')
     parser.add_argument('csv_file', help='Path to the CSV file with form submissions')
     parser.add_argument('student_number', help='Student number to search for')
+    parser.add_argument('-p', '--points', help='Path to the CSV file with points (optional)')
     parser.add_argument('-o', '--output', help='Output file (optional, prints to stdout if not provided)')
     parser.add_argument('--pdf', action='store_true', help='Generate PDF output (requires markdown and weasyprint packages)')
     args = parser.parse_args()
@@ -212,7 +236,13 @@ if __name__ == "__main__":
     try:
         # Load CSV data once as dictionary
         submissions_dict, headers = load_submissions_dict(args.csv_file)
-        markdown_output = generate_markdown_table(submissions_dict, headers, int(args.student_number))
+
+        # Load points data if provided
+        points_dict = None
+        if args.points:
+            points_dict, _ = load_submissions_dict(args.points)
+
+        markdown_output = generate_markdown_table(submissions_dict, headers, int(args.student_number), points_dict)
 
         if markdown_output is None:
             print(f"Student number {args.student_number} not found in the CSV file.")
