@@ -26,14 +26,25 @@ def extract_question_name(header):
     return header
 
 
-def get_submissions(csv_file, student_number):
-    """Find the row for a specific student number in the CSV file."""
+def load_submissions_dict(csv_file):
+    """Load all submissions from CSV file as a dictionary with student number as key."""
+    submissions = {}
+    headers = []
+
     with open(csv_file, 'r', encoding='utf-8') as file:
         reader = csv.DictReader(file)
+        headers = reader.fieldnames
+
         for row in reader:
-            if row.get('Student number') == str(student_number):
-                return row
-    return None
+            student_number = row.get('Student number')
+            if student_number:
+                try:
+                    submissions[int(student_number)] = row
+                except ValueError:
+                    # Skip rows with invalid student numbers
+                    continue
+
+    return submissions, headers
 
 
 def get_question_columns(headers):
@@ -71,19 +82,14 @@ def group_questions_by_exercise(question_columns):
     return sorted_exercises
 
 
-def generate_markdown_table(csv_file, student_number) -> str:
+def generate_markdown_table(submissions_dict: dict, headers: list, student_number) -> str:
     """Generate a markdown table with student answers for each question, grouped by exercise."""
 
     # Find the student's row
-    student_row = get_submissions(csv_file, student_number)
+    student_row = submissions_dict.get(int(student_number))
 
     if not student_row:
-        return f"Student number {student_number} not found in the CSV file."
-
-    # Get all headers
-    with open(csv_file, 'r', encoding='utf-8') as file:
-        reader = csv.reader(file)
-        headers = next(reader)
+        return None
 
     # Get question columns
     question_columns = get_question_columns(headers)
@@ -97,9 +103,11 @@ def generate_markdown_table(csv_file, student_number) -> str:
     # Get student info
     student_name = f"{student_row.get('First name', '')} {student_row.get('Last name', '')}"
     student_score = student_row.get('Score', 'N/A')
+    timestamp = student_row.get('Timestamp', 'N/A')
 
     # Generate markdown with separate tables for each exercise
-    markdown = f"# Student Answers - {student_name} (Student #{student_number})\n\n"
+    markdown = f"# Student Answers - {student_name} - Student no: {student_number}\n\n"
+    markdown += f"**Submitted:** {timestamp}\n\n"
     markdown += f"**Score:** {student_score}\n\n"
 
     for exercise_num, questions in exercises.items():
@@ -202,7 +210,13 @@ if __name__ == "__main__":
     print(args)
 
     try:
-        markdown_output = generate_markdown_table(args.csv_file, args.student_number)
+        # Load CSV data once as dictionary
+        submissions_dict, headers = load_submissions_dict(args.csv_file)
+        markdown_output = generate_markdown_table(submissions_dict, headers, int(args.student_number))
+
+        if markdown_output is None:
+            print(f"Student number {args.student_number} not found in the CSV file.")
+            sys.exit(1)
 
         if args.pdf:
             # Generate PDF output
