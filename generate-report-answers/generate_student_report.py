@@ -83,7 +83,7 @@ def group_questions_by_exercise(question_columns):
     return sorted_exercises
 
 
-def generate_markdown_table(submissions_dict, headers, student_number, points_dict=None, perfect_std=9999999) -> str:
+def generate_markdown_table(submissions_dict, headers, student_number, points_dict=None, perfect_std=9999999, additional_markdown="") -> str:
     """Generate a markdown table with student answers for each question, grouped by exercise."""
 
     # Find the student's row
@@ -113,7 +113,7 @@ def generate_markdown_table(submissions_dict, headers, student_number, points_di
     timestamp = student_row.get('Timestamp', 'N/A')
 
     # Generate markdown with separate tables for each exercise
-    markdown = f"# Student Answers - {student_name} - Student no: {student_number}\n\n"
+    markdown = f"# Student Answers: {student_name} - {student_number}\n\n"
     markdown += f"**Submitted:** {timestamp}\n\n"
     markdown += f"**Score:** {student_score}\n\n"
 
@@ -156,6 +156,12 @@ def generate_markdown_table(submissions_dict, headers, student_number, points_di
                 markdown += f"| {question_name} | {answer} |\n"
 
         markdown += "\n"  # Add space between exercise tables
+
+    # Add additional markdown content if provided
+    if additional_markdown.strip():
+        markdown += "\n---\n\n"  # Add separator
+        markdown += additional_markdown
+        markdown += "\n"
 
     return markdown
 
@@ -234,6 +240,7 @@ if __name__ == "__main__":
                         type=int,
                         default=9999999,
                         help='Number of perfect students (to get total points per question) Default: %(default)s')
+    parser.add_argument('-a', '--additional', help='Path to markdown file with additional content to append to reports (optional)')
     args = parser.parse_args()
     print(args)
 
@@ -247,6 +254,17 @@ if __name__ == "__main__":
         points_dict = None
         if args.points:
             points_dict, _ = load_submissions_dict(args.points)
+        
+        # Load additional markdown content if provided
+        additional_markdown = ""
+        if args.additional:
+            try:
+                with open(args.additional, 'r', encoding='utf-8') as f:
+                    additional_markdown = f.read()
+            except FileNotFoundError:
+                print(f"Warning: Additional markdown file '{args.additional}' not found. Skipping additional content.")
+            except Exception as e:
+                print(f"Warning: Could not read additional markdown file '{args.additional}': {e}. Skipping additional content.")
 
         # Process each student number
         n = len(args.student_number)
@@ -258,7 +276,7 @@ if __name__ == "__main__":
                 print(f"Error: Invalid student number '{student_num}'. Skipping.")
                 continue
 
-            markdown_output = generate_markdown_table(submissions_dict, headers, student_number, points_dict=points_dict, perfect_std=args.perfect)
+            markdown_output = generate_markdown_table(submissions_dict, headers, student_number, points_dict=points_dict, perfect_std=args.perfect, additional_markdown=additional_markdown)
 
             if markdown_output is None:
                 print(f"Student number {student_number} not found in the CSV file. Skipping...")
