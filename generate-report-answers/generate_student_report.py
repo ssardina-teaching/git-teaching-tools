@@ -11,7 +11,7 @@ import csv
 from pathlib import Path
 import sys
 import argparse
-import os
+import regex as re
 try:
     import markdown
     import weasyprint
@@ -20,6 +20,13 @@ except ImportError:
     PDF_AVAILABLE = False
 
 
+COL_STD_NO = 'Student number'
+COL_TIMESTAMP = 'Timestamp'
+COL_FIRST_NAME = 'First name'
+COL_LAST_NAME = 'Last name'
+COL_SCORE = 'Score'
+COLS_SPECIAL = {COL_STD_NO, COL_TIMESTAMP, COL_FIRST_NAME, COL_LAST_NAME, COL_SCORE}
+
 def extract_question_name(header):
     """Extract question name from header by taking everything up to the first full stop."""
     if '.' in header:
@@ -27,99 +34,106 @@ def extract_question_name(header):
     return header
 
 
+def extract_question_id(header):
+    """Extract question id from header and question number.
+    If header is 'E2(b)ii.Enter your answer.' it return (E2(b)ii, 2)"""
+    match = re.match(r"(E(\d+).*?)\.", header)
+
+    if match:
+        question_id = match.group(1)
+        question_num = int(match.group(2))
+        return question_id, question_num
+    return None, None
+
+
 def load_submissions_dict(csv_file):
     """Load all submissions from CSV file as a dictionary with student number as key."""
     submissions = {}
-    headers = []
 
     with open(csv_file, 'r', encoding='utf-8') as file:
         reader = csv.DictReader(file)
-        headers = reader.fieldnames
 
         for row in reader:
-            student_number = row.get('Student number')
-            if student_number:
-                try:
-                    submissions[int(student_number)] = row
-                except ValueError:
-                    # Skip rows with invalid student numbers
-                    continue
+            try:
+                student_number = int(row.get(COL_STD_NO))
 
-    return submissions, headers
+                # extract answers from this student for each question
+                answers = dict()
+                answers["Timestamp"] = row.get("Timestamp", "")
+                answers["First name"] = row.get("First name", "")
+                answers["Last name"] = row.get("Last name", "")
+                answers["Score"] = row.get("Score", "")
+
+                for key in row:
+                    question_id, _ = extract_question_id(key)
+                    if question_id is not None:
+                        answers[question_id] = row[key]
+
+                submissions[student_number] = answers
+            except ValueError:
+                # Skip rows with invalid student numbers
+                continue
+
+    return submissions
 
 
-def get_question_columns(headers):
-    """Get columns that contain questions (starting with 'E' and containing '.')."""
-    question_columns = []
-    for header in headers:
+def get_exercises(answers: dict):
+    """Divide question IDs into exercises based on question numbers.
+
+    questions[question_no] = [question_id1, question_id2, ...]
+    """
+    questions = dict()
+    for question_id in answers:
         # Look for headers that start with 'E' and contain a period (questions)
-        if header.startswith('E') and '.' in header:
-            question_columns.append(header)
-    return question_columns
+        if question_id in COLS_SPECIAL:
+            continue
+        question_no = int(re.findall(r"\d+", question_id)[0])
+        if question_no not in questions:
+            questions[question_no] = [question_id]
+        else:
+            questions[question_no].append(question_id)
+    return questions
 
 
-def group_questions_by_exercise(question_columns):
-    """Group question columns by exercise number (E1, E2, etc.)."""
-    exercises = {}
-    for question_header in question_columns:
-        question_name = extract_question_name(question_header)
-        # Extract exercise number (E1, E2, E3, etc.)
-        if question_name.startswith('E') and len(question_name) > 1:
-            # Find where the exercise number ends
-            i = 1
-            while i < len(question_name) and question_name[i].isdigit():
-                i += 1
-            exercise_num = question_name[:i]  # E1, E2, E3, etc.
-
-            if exercise_num not in exercises:
-                exercises[exercise_num] = []
-            exercises[exercise_num].append((question_header, question_name))
-
-    # Sort exercises by number
-    sorted_exercises = {}
-    for exercise in sorted(exercises.keys(), key=lambda x: int(x[1:]) if x[1:].isdigit() else 999):
-        sorted_exercises[exercise] = exercises[exercise]
-
-    return sorted_exercises
 
 
-def generate_markdown_table(submissions_dict, headers, student_number, points_dict=None, perfect_std=9999999, additional_markdown="") -> str:
+def generate_markdown_table(submissions_dict, student_number, points_dict=None, perfect_std=9999999, additional_markdown="") -> str:
     """Generate a markdown table with student answers for each question, grouped by exercise."""
 
     # Find the student's row
-    student_row = submissions_dict.get(int(student_number))
+    student_dict = submissions_dict.get(student_number)
 
-    if not student_row:
+    if not student_dict:
         return None
 
     # Find the points row if points_dict is provided
-    points_row = points_dict.get(int(student_number)) if points_dict else None
+    points_row = points_dict.get(student_number, None)
 
     # Get the full marks row (student number 1111111) for total points reference
-    full_marks_row = points_dict.get(perfect_std) if points_dict else None
+    full_marks_row = points_dict.get(perfect_std, None)
 
     # Get question columns
-    question_columns = get_question_columns(headers)
+    print(next(iter(submissions_dict.values())))
 
-    if not question_columns:
+    # get dictionary of exercises (each key is a number, value is list of question ids)
+    exercises = get_exercises(next(iter(submissions_dict.values())))
+
+    if not exercises:
         return "No question columns found in the CSV file."
 
-    # Group questions by exercise
-    exercises = group_questions_by_exercise(question_columns)
-
     # Get student info
-    student_name = f"{student_row.get('First name', '')} {student_row.get('Last name', '')}"
-    student_score = student_row.get('Score', 'N/A')
-    timestamp = student_row.get('Timestamp', 'N/A')
+    student_name = f"{student_dict.get('First name', '')} {student_dict.get('Last name', '')}"
+    student_score = student_dict.get('Score', 'N/A')
+    timestamp = student_dict.get('Timestamp', 'N/A')
 
     # Generate markdown with separate tables for each exercise
     markdown = f"# Student Answers: {student_name} - {student_number}\n\n"
     markdown += f"**Submitted:** {timestamp}\n\n"
     markdown += f"**Score:** {student_score}\n\n"
 
-    for exercise_num, questions in exercises.items():
+    for exercise_no in exercises:
         # Add exercise header
-        markdown += f"## Exercise {exercise_num[1:]} ({exercise_num})\n\n"
+        markdown += f"## Exercise {exercise_no}\n\n"
 
         # Add table header (include points column if points data is available)
         if points_row:
@@ -130,8 +144,8 @@ def generate_markdown_table(submissions_dict, headers, student_number, points_di
             markdown += "|----------|--------|\n"
 
         # Add questions for this exercise
-        for question_header, question_name in questions:
-            answer = student_row.get(question_header, '').strip()
+        for question_id in exercises[exercise_no]:
+            answer = student_dict.get(question_id, '').strip()
 
             # Handle empty answers
             if not answer:
@@ -142,18 +156,18 @@ def generate_markdown_table(submissions_dict, headers, student_number, points_di
 
             # Get points if available
             if points_row:
-                student_pts = points_row.get(question_header, 'N/A')
+                student_pts = points_row.get(question_id, 'N/A')
 
                 points_display = f"{student_pts}"
 
                 # add total marks out of if available
                 if full_marks_row:
-                    total_points = full_marks_row.get(question_header, 'N/A')
+                    total_points = full_marks_row.get(question_id, 'N/A')
                     points_display += f" / {total_points}"
 
-                markdown += f"| {question_name} | {answer} | {points_display} |\n"
+                markdown += f"| {question_id} | {answer} | {points_display} |\n"
             else:
-                markdown += f"| {question_name} | {answer} |\n"
+                markdown += f"| {question_id} | {answer} |\n"
 
         markdown += "\n"  # Add space between exercise tables
 
@@ -232,11 +246,11 @@ def convert_to_pdf(markdown_content, pdf_path : Path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate markdown table with student answers from CSV')
-    parser.add_argument('csv_file', help='Path to the CSV file with form submissions')
+    parser.add_argument('csv_answers', help='Path to the CSV file with form submission answers')
     parser.add_argument('student_number', nargs='+', help='Student number(s) to search for (can specify multiple)')
     parser.add_argument('report_folder', help='Folder to save reports')
     parser.add_argument('-p', '--points', help='Path to the CSV file with points (optional)')
-    parser.add_argument('-ps', '--perfect',
+    parser.add_argument('-pp', '--perfect',
                         type=int,
                         default=9999999,
                         help='Number of perfect students (to get total points per question) Default: %(default)s')
@@ -248,13 +262,14 @@ if __name__ == "__main__":
 
     try:
         # Load CSV data once as dictionary
-        submissions_dict, headers = load_submissions_dict(args.csv_file)
+        answers_dict = load_submissions_dict(args.csv_answers)
 
         # Load points data if provided
         points_dict = None
         if args.points:
-            points_dict, _ = load_submissions_dict(args.points)
-        
+            points_dict = load_submissions_dict(args.points)
+
+
         # Load additional markdown content if provided
         additional_markdown = ""
         if args.additional:
@@ -276,7 +291,7 @@ if __name__ == "__main__":
                 print(f"Error: Invalid student number '{student_num}'. Skipping.")
                 continue
 
-            markdown_output = generate_markdown_table(submissions_dict, headers, student_number, points_dict=points_dict, perfect_std=args.perfect, additional_markdown=additional_markdown)
+            markdown_output = generate_markdown_table(answers_dict, student_number, points_dict=points_dict, perfect_std=args.perfect, additional_markdown=additional_markdown)
 
             if markdown_output is None:
                 print(f"Student number {student_number} not found in the CSV file. Skipping...")
