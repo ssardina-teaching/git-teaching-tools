@@ -12,42 +12,9 @@ This Python script generates a markdown table with individual student answers fr
 - Handles missing answers gracefully
 - Can output to file or stdout
 
-## Usage
-
-### Basic usage (output to console)
-
-```bash
-python generate_student_answers.py form-submissions.csv 1234567
+```shell
+python generate_student_report.py ai25/data/marking-answers.csv 4045974 3949213 4150884 4137524 4160447 4112655 4089452 4118718 3936636 3950363 4022443 4068947 4008599 4031723 4120116 3878174 4036988 4057674 4119444 4129283 4124147 4005841 3976417 3991657 4032080 4137065 4098655 3945471 4021650 3934367 4065752 4101575 3987027 ai25/reports -p ai25/data/marking-points.csv
 ```
-
-### Save to markdown file
-
-```bash
-python generate_student_answers.py form-submissions.csv 1234567 -o student_answers.md
-```
-
-### Generate PDF output
-
-```bash
-# Generate PDF with default filename
-python generate_student_answers.py form-submissions.csv 1234567 --pdf
-
-# Generate PDF with custom filename
-python generate_student_answers.py form-submissions.csv 1234567 --pdf -o custom_name.pdf
-```
-
-### Get help
-
-```bash
-python generate_student_answers.py --help
-```
-
-## Arguments
-
-- `csv_file`: Path to the CSV file with form submissions
-- `student_number`: Student number to search for
-- `-o, --output`: Optional output file (prints to stdout if not provided)
-- `--pdf`: Generate PDF output instead of markdown
 
 ## PDF Requirements
 
