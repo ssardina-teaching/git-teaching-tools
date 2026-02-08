@@ -30,6 +30,7 @@ Feel free to use them as desired. No guarantees and I am sure they will have bug
     - [`gh_user_access.py`: get repos and accesses of org](#gh_user_accesspy-get-repos-and-accesses-of-org)
     - [`gh_issue_labels.py`: get/update issue labels in a GH repo](#gh_issue_labelspy-getupdate-issue-labels-in-a-gh-repo)
     - [`gh_refresh_invite.sh`: Refresh pending repo invitations](#gh_refresh_invitesh-refresh-pending-repo-invitations)
+    - [`gh_transfer_issues.py`: transfer issues between repos](#gh_transfer_issuespy-transfer-issues-between-repos)
   - [Git Tools](#git-tools)
     - [`git_clone_submissions.py`: batch git cloning](#git_clone_submissionspy-batch-git-cloning)
     - [`git_batch_commit.sh`: bulk commit and push to repos](#git_batch_commitsh-bulk-commit-and-push-to-repos)
@@ -335,6 +336,18 @@ Processing invitation for user: garimlaw
   -> Re-creating invitation for user: garimlaw
 ```
 
+### `gh_transfer_issues.py`: transfer issues between repos
+
+While GH provides facilities to transfer issues in repos within organizations, there is no tool when repos are in different organizations (e.g., different year editions of a course).
+
+This script will do so, by creating a temporary repository that is transfered from the source organizations to the destination one:
+
+```shell
+$ python gh_transfer_issues.py  RMIT-COSC2780-2973-IDM25/project-exam-timetabling-solution RMIT-COSC2780-2973-IDM26/test -t ~/.ssh/keys/gh-token-ssardina.txt
+```
+
+> [!IMPORTANT]
+> Enough permissions are required in both repos, both organizations (to create the temp repo), and in the access token (e.g., to delete the temporary repo).
 
 ## Git Tools
 

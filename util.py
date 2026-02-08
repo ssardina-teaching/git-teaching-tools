@@ -7,7 +7,8 @@ import git
 
 # get the TIMEZONE to be used - ZoneInfo requires Python 3.9+
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo  # Python 3.9+
+from zoneinfo import ZoneInfo
+
 TIMEZONE_STR = "Australia/Melbourne"  # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 DATE_FORMAT = "%-d/%-m/%Y %-H:%-M:%-S"  # RMIT Uni (Australia)
 TIMEZONE = ZoneInfo(TIMEZONE_STR)
@@ -74,17 +75,23 @@ def get_repos_from_csv(csv_file, repos_ids=None, ignore_ids=None) -> list[dict]:
     return repos
 
 
+def read_token(token_file):
+    with open(token_file, "r") as f:
+        return f.read().strip()
+
+
 def open_gitHub(token_file=None, token=None, user=None, password=None):
     # Authenticate to GitHub
     if token:
         auth = Auth.Token(token)
         g = Github(auth=auth)
-    if token_file:
-        with open(token_file) as fh:
-            token = fh.read().strip()
+    elif token_file:
+        token = read_token(token_file)
         g = Github(token)
     elif user and password:
         g = Github(user, password)
+    else:
+        raise Exception("No authentication provided, quitting....")
     return g
 
 
@@ -126,6 +133,7 @@ def get_tag_info(repo: git.Repo, tag_str="head"):
 
 def get_time_now():
     return datetime.now(tz=TIMEZONE).strftime("%Y-%m-%d-%H-%M-%S")
+
 
 def date_to_utc(date: datetime) -> datetime:
     """
@@ -176,6 +184,7 @@ def print_repo_info(repo : Repository):
     except:
         pass
 
+
 def add_csv(csv_file: str, header: list, rows: list, append=True, quoting=csv.QUOTE_MINIMAL, timestamp=None):
     # build the dictionary for each row
     dict_rows = [dict(zip(header, row)) for row in rows]
@@ -195,3 +204,4 @@ def add_csv(csv_file: str, header: list, rows: list, append=True, quoting=csv.QU
             writer.writeheader()
 
         writer.writerows(dict_rows)
+

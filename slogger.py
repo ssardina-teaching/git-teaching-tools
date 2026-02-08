@@ -14,7 +14,7 @@ Good video and code on Python logging:
 
 Some information on Python logging and this logger:
 
-- Since it is a simple applicaiton, we only attach handlers to the root logger; all other applicatoin loggers have no handlers and they propagate to the root logger.
+- Since it is a simple applicaiton, we only attach handlers to the root logger; all other application loggers have no handlers and they propagate to the root logger.
 - The level of the app logger ("pyNBL") controls what gets created at all and propagated up.
 - The level of a logger affects the creation of a record at that level, not whether it is passed to handlers or propagated.
 - So, once created, if propagated, the level of the root doesn't matter (it was created already!), only the level of the hanlders matters.
@@ -24,7 +24,7 @@ Some information on Python logging and this logger:
 - We implemente identation by adding indent data to the record in the logger, and then using it in the formatter via the string with %(indent)s.
 - The timezone is set in the formatter and used to format the time in the log record.
 
-We can create a logger with empty handlers, propagation, and a console hanlder in root:
+We can create a logger with empty handlers, propagation, and a console handler in root:
 
     import logging
     from slogger import setup_logging
@@ -32,7 +32,7 @@ We can create a logger with empty handlers, propagation, and a console hanlder i
     logger.setLevel(logging.INFO)  # set the level of the application logger
     logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
-we can then create within the app a sub-logger:
+If we want, we can create within the app a sub-logger season within the app logger pyNBL:
 
     logger_season = logging.getLogger("pyNBL.season")
 
@@ -40,7 +40,7 @@ IMPORTANT: setup_logging() must be called only once in the application, otherwis
 
 - Since we are working with the root logger, if we set it to DEBUG, all debug messages of 3rd party libraries will be printed. To avoid this, we can set the level of the root logger to INFO or WARNING,
     - logging.root.setLevel(logging.INFO)  # set the level of the root logger
-    - remember that propagated messages are filtered by the level of the handlers, not the level of the root logger, so if we emit in teh app level at DEBUG level it will stil be printed if the handler console we attached to root is at DEBUG level.
+    - remember that propagated messages are filtered by the level of the handlers, not the level of the root logger, so if we emit in teh app level at DEBUG level it will stll be printed if the handler console we attached to root is at DEBUG level.
 """
 
 from datetime import datetime
