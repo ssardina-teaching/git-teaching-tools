@@ -58,7 +58,7 @@ def transfer_issue(issue_id, target_repo_id):
     return gh_utils.run_query(mutation, {"issueId": issue_id, "repositoryId": target_repo_id})
 
 
-def transfer_issues(repo1, repo2):
+def transfer_issues(repo1, repo2, closed=False):
     org1, name1 = repo1.split("/")
     org2, name2 = repo2.split("/")
 
@@ -66,7 +66,7 @@ def transfer_issues(repo1, repo2):
     try:
         # repo1_id = gh_utils.get_repository_node_id(org1, name1)
         repo2_id = gh_utils.get_repository_node_id(org2, name2)
-        issues = gh_utils.get_issues(org1, name1, closed=True)
+        issues = gh_utils.get_issues(org1, name1, closed=closed)
     except Exception as e:
         raise Exception(f"❌ Initialization of issue transferring failed: {e}")
 
@@ -116,6 +116,12 @@ def main():
         "DEST_REPO", help="Destination repository in format org/repo"
     )
     parser.add_argument(
+        "--closed", action="store_true", help="Whether to transfer closed issues as well"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Run the script without making any changes (for testing)"
+    )
+    parser.add_argument(
         "--token-file", "-t", required=True, help="File containing GitHub token"
     )
     args = parser.parse_args()
@@ -145,8 +151,8 @@ def main():
 
     # not really needed.... but we can check if the repos exist and we have access to them before starting the transfer
     try:
-        gh_source_repo = gh.get_repo(source_repo_full)
-        gh_dest_repo = gh.get_repo(dest_repo_full)
+        gh.get_repo(source_repo_full)
+        gh.get_repo(dest_repo_full)
     except GithubException as e:
         logger.error(f"Error accessing source/destination repositories: {e}")
         exit(1)
@@ -172,7 +178,7 @@ def main():
     # # 2. Transfer issues A -> T
     # # ==========================
     logger.info(f"Transferring ALL issues {args.SOURCE_REPO} ---> {gh_temp_repo.full_name}")
-    transfer_issues(args.SOURCE_REPO, gh_temp_repo.full_name)
+    transfer_issues(args.SOURCE_REPO, gh_temp_repo.full_name, closed=args.closed)
 
     # ==========================
     # 3. Transfer repo T to destination org
@@ -199,7 +205,7 @@ def main():
     logger.info(
         f"Transferring ALL issues in {gh_temp_repo.full_name} ---> {gh_repo_dest.full_name}"
     )
-    transfer_issues(gh_temp_repo.full_name, gh_repo_dest.full_name)
+    transfer_issues(gh_temp_repo.full_name, gh_repo_dest.full_name, closed=True)
 
     # ==========================
     # 5. Delete temporary repo
