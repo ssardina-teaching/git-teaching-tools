@@ -400,7 +400,7 @@ if __name__ == "__main__":
         "--remark",
         default=False,
         action="store_true",
-        help="Remark even if commit was already marked (Default: %(deafault)s).",
+        help="Remark even if commit was already marked (Default: %(default)s).",
     )
     parser.add_argument(
         "--dry-run",
