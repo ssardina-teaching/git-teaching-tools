@@ -131,6 +131,10 @@ def main():
     source_org_name, source_repo_name = gh_utils.parse_full_repo(source_repo_full)
     dest_org_name, dest_repo_name = gh_utils.parse_full_repo(dest_repo_full)
 
+    same_org = False
+    if source_org_name == dest_org_name:
+        same_org = True
+
     ###############################################
     # 0. Authenticate to GitHub
     ###############################################
@@ -157,45 +161,53 @@ def main():
         logger.error(f"Error accessing source/destination repositories: {e}")
         exit(1)
 
-    # ==========================
-    # 1. Create temporary repo in source org
-    # ==========================
-    gh_source_org = gh.get_organization(source_org_name)
+    # we use a temp repo to transfer issues from
+    #  if same org, then temp is just the source repo
+    #  otherwise, create temp in source to get all issues, then transfer ownership to dest org, then transfer issues to dest repo, then delete temp
+    if same_org:
+        logger.info("Source and destination repos are in the same organization. No need for temporary repo.")
+        gh_temp_repo = gh.get_repo(source_repo_full)
+    else:
+        # ==========================
+        # 1. Create temporary repo in source org
+        #   repo name will be "temp"
+        # ==========================
+        gh_source_org = gh.get_organization(source_org_name)
 
-    try:
-        # here we use PyGithub to create a temporary repo
-        gh_temp_repo = gh_source_org.create_repo(
-            name="temp", private=True, auto_init=True
+        try:
+            # here we use PyGithub to create a temporary repo
+            gh_temp_repo = gh_source_org.create_repo(
+                name="temp", private=True, auto_init=True
+            )
+            logger.info(f"Created temporary repo {gh_temp_repo.full_name} for issue transfer.")
+        except GithubException as e:
+            logger.error(f"Error creating temp repo in source: {e}")
+            gh_temp_repo = gh.get_repo(f"{source_org_name}/temp")
+            logger.info(f"Using existing temporary repo {gh_temp_repo.full_name} for issue transfer.")
+            # exit(1)
+
+        # # ==========================
+        # # 2. Transfer issues A -> T
+        # # ==========================
+        logger.info(f"Transferring ALL issues {args.SOURCE_REPO} ---> {gh_temp_repo.full_name}")
+        transfer_issues(args.SOURCE_REPO, gh_temp_repo.full_name, closed=args.closed)
+
+        # ==========================
+        # 3. Transfer repo T to destination org
+        # ==========================
+        # easier and clearner to do via REST API than GraphQL, as there is a specific endpoint for this: https://docs.github.com/rest/repos/repos#transfer-a-repository
+        logger.info(f"Transferring repo {gh_temp_repo.full_name} to organization {dest_org_name}")
+        transfer_url = (
+            f"https://api.github.com/repos/{source_org_name}/temp/transfer"
         )
-        logger.info(f"Created temporary repo {gh_temp_repo.full_name} for issue transfer.")
-    except GithubException as e:
-        logger.error(f"Error creating temp repo in source: {e}")
-        gh_temp_repo = gh.get_repo(f"{source_org_name}/temp")
-        logger.info(f"Using existing temporary repo {gh_temp_repo.full_name} for issue transfer.")
-        # exit(1)
+        response = requests.post(
+            transfer_url, headers=HEADERS, json={"new_owner": dest_org_name}
+        )
+        if response.status_code not in (202, 201):
+            raise RuntimeError(f"Repo transfer failed: {response.text}")
 
-    # # ==========================
-    # # 2. Transfer issues A -> T
-    # # ==========================
-    logger.info(f"Transferring ALL issues {args.SOURCE_REPO} ---> {gh_temp_repo.full_name}")
-    transfer_issues(args.SOURCE_REPO, gh_temp_repo.full_name, closed=args.closed)
-
-    # ==========================
-    # 3. Transfer repo T to destination org
-    # ==========================
-    # easier and clearner to do via REST API than GraphQL, as there is a specific endpoint for this: https://docs.github.com/rest/repos/repos#transfer-a-repository
-    logger.info(f"Transferring repo {gh_temp_repo.full_name} to organization {dest_org_name}")
-    transfer_url = (
-        f"https://api.github.com/repos/{source_org_name}/temp/transfer"
-    )
-    response = requests.post(
-        transfer_url, headers=HEADERS, json={"new_owner": dest_org_name}
-    )
-    if response.status_code not in (202, 201):
-        raise RuntimeError(f"Repo transfer failed: {response.text}")
-
-    # Wait until repo appears in destination org
-    gh_temp_repo = wait_for_repo(gh, f"{dest_org_name}/temp")
+        # Wait until repo appears in destination org
+        gh_temp_repo = wait_for_repo(gh, f"{dest_org_name}/temp")
 
     # # ==========================
     # # 4. Transfer issues T -> B
@@ -208,11 +220,12 @@ def main():
     transfer_issues(gh_temp_repo.full_name, gh_repo_dest.full_name, closed=True)
 
     # ==========================
-    # 5. Delete temporary repo
+    # 5. Delete temporary repo if was needed
     # ==========================
-    logger.info("Deleting temporary repo")
-    gh_temp_repo.delete()
-    logger.info("Issue transfer completed successfully. 🏆")
+    if not same_org:
+        logger.info("Deleting temporary repo")
+        gh_temp_repo.delete()
+        logger.info("Issue transfer completed successfully. 🏆")
 
 
 if __name__ == "__main__":
