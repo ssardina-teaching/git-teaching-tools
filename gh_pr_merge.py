@@ -13,15 +13,15 @@ Some usage help on PyGithub:
     https://www.thepythoncode.com/article/using-github-api-in-python
 """
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
-__copyright__ = "Copyright 2019-2023"
+__copyright__ = "Copyright 2019-2026"
 
 from argparse import ArgumentParser
-import os
 from typing import List
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Github, Repository, Organization, GithubException
 
+import util
 from util import (
     TIMEZONE,
     UTC,
@@ -34,13 +34,12 @@ from util import (
 )
 from datetime import datetime
 
-SCRIPT_NAME = os.path.basename(__file__)
+SCRIPT_NAME = "git_merge_pr"
 import logging
 from slogger import setup_logging
 logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)
 logger.setLevel(logging.INFO)  # set the level of the application logger
-logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
-
+logger.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
 
 if __name__ == "__main__":
@@ -64,14 +63,14 @@ if __name__ == "__main__":
     logger.info(args, depth=1)
 
     if args.no is None and args.title is None:
-        logging.error("You must provide a PR number or title to merge.")
+        logger.error("You must provide a PR number or title to merge.")
         exit(1)
 
     # Get the list of TEAM + GIT REPO links from csv file
     list_repos = util.get_repos_from_csv(args.REPO_CSV, args.repos)
 
     if len(list_repos) == 0:
-        logging.error(
+        logger.error(
             f'No repos found in the mapping file "{args.REPO_CSV}". Stopping.'
         )
         exit(0)
@@ -82,12 +81,12 @@ if __name__ == "__main__":
     # Authenticate to GitHub
     ###############################################
     if not args.token_file and not (args.user or args.password):
-        logging.error("No authentication provided, quitting....")
+        logger.error("No authentication provided, quitting....")
         exit(1)
     try:
         g = util.open_gitHub(token_file=args.token_file)
     except Exception as e:
-        logging.error(
+        logger.error(
             f"Something wrong happened during GitHub authentication. Check credentials. Exception: {e}"
         )
         exit(1)
@@ -105,7 +104,7 @@ if __name__ == "__main__":
         repo_id = r["REPO_ID_SUFFIX"]
         repo_name = r["REPO_ID"]
         repo_url = f"{GH_HTTP_URL_PREFIX}/{repo_name}"
-        logging.info(f"Processing repo {k}/{no_repos}: {repo_id} ({repo_url})...")
+        logger.info(f"Processing repo {k}/{no_repos}: {repo_id} ({repo_url})...")
 
         repo = g.get_repo(repo_name)
         prs = repo.get_pulls(state="all", direction="desc")
@@ -113,7 +112,7 @@ if __name__ == "__main__":
         pr_selected = None
         if args.no is not None:
             if prs.totalCount < args.no:
-                logging.error(
+                logger.error(
                     f"No PR with number {args.no} - Repo has only {prs.totalCount} PRs.", depth=1
                 )
                 exit(1)
@@ -125,28 +124,28 @@ if __name__ == "__main__":
                     pr_selected = pr
                     break
             if pr_selected is None:
-                logging.warning(f"No PR containing '{args.title}' in title.", depth=1)
+                logger.warning(f"No PR containing '{args.title}' in title.", depth=1)
                 continue
 
-        logging.info(f"Found relevant PR: {pr_selected}", depth=1)
+        logger.info(f"Found relevant PR: {pr_selected}", depth=1)
 
         if pr_selected.merged:
-            logging.info("PR already merged.", depth=1)
+            logger.info("PR already merged.", depth=1)
             continue
 
-        logging.info(f"PR is still not merged - will try to merge it: {pr_selected}", depth=1)
+        logger.info(f"PR is still not merged - will try to merge it: {pr_selected}", depth=1)
         try:
             status = pr_selected.merge(merge_method="merge")
             if status.merged:
-                logging.info("Successful merging...", depth=1)
+                logger.info("Successful merging...", depth=1)
                 no_merged += 1
             else:
-                logging.error(f"MERGING DIDN'T WORK - STATUS: {status}", depth=1)
+                logger.error(f"MERGING DIDN'T WORK - STATUS: {status}", depth=1)
                 no_errors += 1
         except GithubException as e:
-            logging.error(f"MERGING FAILED WITH EXCEPTION: {e}", depth=1)
+            logger.error(f"MERGING FAILED WITH EXCEPTION: {e}", depth=1)
             no_errors += 1
 
-    logging.info(
+    logger.info(
         f"Finished! Total repos: {no_repos} - Merged successfully: {no_merged} - Failed to merge: {no_errors}."
     )

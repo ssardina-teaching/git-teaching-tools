@@ -20,7 +20,6 @@ message.py should have a string constant MESSAGE
 """
 __author__ = "Sebastian Sardina & Andrew Chester - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2024-2025"
-import csv
 import os
 from argparse import ArgumentParser
 from pathlib import Path
