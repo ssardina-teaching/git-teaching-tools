@@ -19,7 +19,7 @@ from datetime import datetime
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Github, Repository, Organization, GithubException
 
-import util
+import util, utils_gh
 from util import (
     TIMEZONE,
     UTC,
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         logger.error("No authentication provided, quitting....")
         exit(1)
     try:
-        g = util.open_gitHub(token_file=args.token_file)
+        g = utils_gh.open_gitHub(token_file=args.token_file)
     except:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."

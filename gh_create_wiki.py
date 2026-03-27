@@ -13,7 +13,7 @@ import shutil
 
 from argparse import ArgumentParser
 import git
-import util
+import util, utils_gh
 
 
 WIKI_DIR = 'wiki'

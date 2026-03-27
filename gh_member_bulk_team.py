@@ -20,7 +20,7 @@ import pytz
 
 from argparse import ArgumentParser
 
-import util
+import util, utils_gh
 
 CSV_GITHUB_USERNAME = "github_username"
 CSV_GITHUB_IDENTIFIER = "identifier"
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         logging.error("No authentication provided, quitting....")
         exit(1)
     try:
-        g = util.open_gitHub(
+        g = utils_gh.open_gitHub(
             token=args.token,
             token_file=args.token_file,
             user=args.user,

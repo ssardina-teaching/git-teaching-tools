@@ -1,6 +1,6 @@
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Github, Repository, Organization, GithubException
-import util
+import util, utils_gh
 import re
 
 ORG_NAME = "RMIT-COSC1127-1125-AI21"
@@ -9,7 +9,7 @@ PREFIX = "p2"
 REPO_URL_PATTERN = re.compile(r'^{}/{}-(.*)$'.format(ORG_NAME, PREFIX))
 
 
-g = util.open_gitHub(token_file='/home/ssardina/.ssh/keys/gh-token-ssardina.txt')
+g = utils_gh.open_gitHub(token_file='/home/ssardina/.ssh/keys/gh-token-ssardina.txt')
 org = g.get_organization(ORG_NAME)
 
 org_repos = org.get_repos()

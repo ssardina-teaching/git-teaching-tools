@@ -1,8 +1,6 @@
-import base64
 import csv
 import os
 import shutil
-from github import Github, Repository, Organization, GithubException, Auth
 import git
 
 # get the TIMEZONE to be used - ZoneInfo requires Python 3.9+
@@ -75,24 +73,6 @@ def get_repos_from_csv(csv_file, repos_ids=None, ignore_ids=None) -> list[dict]:
     return repos
 
 
-def read_token(token_file):
-    with open(token_file, "r") as f:
-        return f.read().strip()
-
-
-def open_gitHub(token_file=None, token=None, user=None, password=None):
-    # Authenticate to GitHub
-    if token:
-        auth = Auth.Token(token)
-        g = Github(auth=auth)
-    elif token_file:
-        token = read_token(token_file)
-        g = Github(token)
-    elif user and password:
-        g = Github(user, password)
-    else:
-        raise Exception("No authentication provided, quitting....")
-    return g
 
 
 def get_tag_info(repo: git.Repo, tag_str="head"):
@@ -154,37 +134,6 @@ def backup_file(file_path: str, rename=False):
             shutil.copy(file_path, f"{file_path}-{NOW_TXT}.bak")
 
 
-def print_repo_info(repo : Repository):
-    # repository full name
-    print("Full name:", repo.full_name)
-    # repository description
-    print("Description:", repo.description)
-    # the date of when the repo was created
-    print("Date created:", repo.created_at)
-    # the date of the last git push
-    print("Date of last push:", repo.pushed_at)
-    # home website (if available)
-    print("Home Page:", repo.homepage)
-    # programming language
-    print("Language:", repo.language)
-    # number of forks
-    print("Number of forks:", repo.forks)
-    # number of stars
-    print("Number of stars:", repo.stargazers_count)
-    print("-" * 50)
-    # repository content (files & directories)
-    print("Contents:")
-    for content in repo.get_contents(""):
-        print(content)
-    try:
-        # repo license
-        print(
-            "License:", base64.b64decode(repo.get_license().content.encode()).decode()
-        )
-    except:
-        pass
-
-
 def add_csv(csv_file: str, header: list, rows: list, append=True, quoting=csv.QUOTE_MINIMAL, timestamp=None):
     # build the dictionary for each row
     dict_rows = [dict(zip(header, row)) for row in rows]
@@ -204,4 +153,3 @@ def add_csv(csv_file: str, header: list, rows: list, append=True, quoting=csv.QU
             writer.writeheader()
 
         writer.writerows(dict_rows)
-

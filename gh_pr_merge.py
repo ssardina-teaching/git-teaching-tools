@@ -21,7 +21,7 @@ from typing import List
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Github, Repository, Organization, GithubException
 
-import util
+import util, utils_gh
 from util import (
     TIMEZONE,
     UTC,
@@ -62,7 +62,10 @@ if __name__ == "__main__":
     logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
     logger.info(args, depth=1)
 
-    if args.no is None and args.title is None:
+    pr_number = args.no
+    pr_title = args.title
+
+    if pr_number is None and pr_title is None:
         logger.error("You must provide a PR number or title to merge.")
         exit(1)
 
@@ -84,7 +87,7 @@ if __name__ == "__main__":
         logger.error("No authentication provided, quitting....")
         exit(1)
     try:
-        g = util.open_gitHub(token_file=args.token_file)
+        g = utils_gh.open_gitHub(token_file=args.token_file)
     except Exception as e:
         logger.error(
             f"Something wrong happened during GitHub authentication. Check credentials. Exception: {e}"
@@ -110,21 +113,21 @@ if __name__ == "__main__":
         prs = repo.get_pulls(state="all", direction="desc")
 
         pr_selected = None
-        if args.no is not None:
-            if prs.totalCount < args.no:
+        if pr_number is not None:
+            if prs.totalCount < pr_number:
                 logger.error(
-                    f"No PR with number {args.no} - Repo has only {prs.totalCount} PRs.", depth=1
+                    f"No PR with number {pr_number} - Repo has only {prs.totalCount} PRs.", depth=1
                 )
                 exit(1)
             else:
-                pr_selected = repo.get_pull(args.no)
+                pr_selected = repo.get_pull(pr_number)
         else:
             for pr in prs:
-                if args.title in pr.title:
+                if pr_title in pr.title:
                     pr_selected = pr
                     break
             if pr_selected is None:
-                logger.warning(f"No PR containing '{args.title}' in title.", depth=1)
+                logger.warning(f"No PR containing '{pr_title}' in title.", depth=1)
                 continue
 
         logger.info(f"Found relevant PR: {pr_selected}", depth=1)

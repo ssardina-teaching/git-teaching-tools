@@ -21,8 +21,8 @@ Python 3.6.9 (default, Jul 17 2020, 12:50:27)
 [GCC 8.4.0] on linux
 Type "help", "copyright", "credits" or "license" for more information.
 >>> from github import Github, Repository, Organization, GithubException
->>> import util
->>> g = util.open_gitHub(token_file='/home/ssardina/gh-token-ssardina.txt')
+>>> import util, utils_gh
+>>> g = utils_gh.open_gitHub(token_file='/home/ssardina/gh-token-ssardina.txt')
 /home/ssardina/gh-token-ssardina.txt
 >>> repo = g.get_repo('RMIT-COSC1127-1125-AI/p2-multiagent-aione')
 >>> for contrib in repo.get_stats_contributors():

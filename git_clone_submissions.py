@@ -51,7 +51,7 @@ import traceback
 import git
 
 # local utilities
-import util
+import util, utils_gh
 from util import (
     GH_GIT_URL_PREFIX,
     TIMEZONE,

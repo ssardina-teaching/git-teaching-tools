@@ -32,7 +32,7 @@ import importlib.util
 import sys
 import time
 
-import util
+import util, utils_gh
 from util import (
     NOW_ISO,
     TIMEZONE,
@@ -155,7 +155,7 @@ if __name__ == "__main__":
         logger.error("No token file for authentication provided, quitting....")
         exit(1)
     try:
-        g = util.open_gitHub(token_file=args.token_file)
+        g = utils_gh.open_gitHub(token_file=args.token_file)
     except:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."

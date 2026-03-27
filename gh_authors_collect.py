@@ -27,7 +27,7 @@ from typing import List
 from github import Github, Repository, Organization, GithubException
 
 # local utilities
-import util
+import util, utils_gh
 from util import (
     GH_GIT_URL_PREFIX,
     TIMEZONE,
@@ -251,7 +251,7 @@ if __name__ == "__main__":
         logger.error("No authentication provided, quitting....")
         exit(1)
     try:
-        g = util.open_gitHub(token_file=args.token_file)
+        g = utils_gh.open_gitHub(token_file=args.token_file)
     except:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."

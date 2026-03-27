@@ -54,7 +54,11 @@ import importlib.util
 import sys
 import time
 
-import util
+from github.Issue import Issue
+from github.IssueComment import IssueComment
+
+
+import util, utils_gh
 from util import (
     NOW_ISO,
     TIMEZONE,
@@ -116,7 +120,7 @@ def load_marking_dict(file_path: str, col_key="GHU") -> dict:
     return comment_dict
 
 
-def issue_feedback_comment(pr, message, dry_run=False):
+def issue_feedback_comment(pr: Issue, message: str, dry_run=False) -> IssueComment|None:
     if dry_run:
         print("=" * 80)
         print(message)
@@ -293,7 +297,7 @@ if __name__ == "__main__":
         logger.error("No token file for authentication provided, quitting....")
         exit(1)
     try:
-        g = util.open_gitHub(token_file=args.token_file)
+        g = utils_gh.open_gitHub(token_file=args.token_file)
     except:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."

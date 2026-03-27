@@ -34,7 +34,7 @@ from github.GithubException import GithubException
 
 import logging
 from slogger import setup_logging
-import util
+import util, utils_gh
 logger = setup_logging("transfer_repo", rotating_file="teaching.log", indent=2)
 logger.setLevel(logging.INFO)  # set the level of the application logger
 # logger.setLevel(logging.DEBUG)  # set the level of the application logger

@@ -1,17 +1,10 @@
 """
 Get or update the list of issue labels in a repository
 
-Uses PyGithub (https://github.com/PyGithub/PyGithub) as API to GitHub:
-
-    python3 -m pip install PyGithub
-
-PyGithub documentation: https://pygithub.readthedocs.io/en/latest/introduction.html
-
-Library uses REST API: https://docs.github.com/en/rest
-    https://docs.github.com/en/rest/issues/labels#list-labels-for-a-repository
-
-Some usage help on PyGithub:
-    https://www.thepythoncode.com/article/using-github-api-in-python
+* Uses PyGithub (https://github.com/PyGithub/PyGithub) as API to GitHub:
+* PyGithub documentation: https://pygithub.readthedocs.io/en/latest/introduction.html
+* GitHub REST API: https://docs.github.com/en/rest
+* GitHub GraphQL API: https://docs.github.com/en/graphql
 
 Issue: https://github.com/ssardina-teaching/git-teaching-tools/issues/23
 
@@ -33,11 +26,11 @@ __copyright__ = "Copyright 2025"
 import sys
 import argparse
 import json
-from github import Github, Repository, Organization, GithubException, Auth
+from github import Github
 from github.GithubException import GithubException
 
 
-def read_token(token_str, token_file):
+def read_token(token_str: str, token_file: str) -> str:
     if token_str:
         return token_str.strip()
     elif token_file:

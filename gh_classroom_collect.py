@@ -19,7 +19,7 @@ from argparse import ArgumentParser
 from github import GithubException
 import os
 
-import util
+import util, utils_gh
 from util import (
     REPOS_HEADER_CSV,
     TIMEZONE,
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         )
         exit(1)
     try:
-        g = util.open_gitHub(token=args.token, token_file=args.token_file)
+        g = utils_gh.open_gitHub(token=args.token, token_file=args.token_file)
     except:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."
