@@ -5,10 +5,10 @@ This repo contains useful scripts I developed over the years (since 2015!) to su
 They are almost all Python-based script, using two API libraries:
 
 - [GitPython](https://gitpython.readthedocs.io/en/stable/index.html) (scripts `git_-_xxx.py`):  to perform GIT operations on the filesystem (e.g., cloning, commiting and pushing changes, reverting)
-- [PyGitHub](https://github.com/PyGithub/PyGithub) (scripts `gh_xxx.py`): to perform API calls to [GitHub REST API](https://docs.github.com/en/rest?apiVersion=2022-11-28).
-- Various libraries for accessing Google resorces (spreadsheets, Drive, etc.). These scripts are named `gg_xxx.py`
+- [PyGitHub](https://github.com/PyGithub/PyGithub) (scripts `gh_xxx.py`): to perform API calls to [GitHub REST API](https://docs.github.com/en/rest?apiVersion=2022-11-28) and [GitHub GraphQL API](https://docs.github.com/en/graphql).
 
-Feel free to use them as desired. No guarantees and I am sure they will have bugs or out-dated code! Open an issue or PR as needed.  😉
+> [!CAUTION]
+> These scripts are provided as-is and may contain bugs or outdated code. Use them at your own risk. If you found a bug, open an issue or PR as needed.  😉
 
 - [Teaching scripts](#teaching-scripts)
   - [Setup](#setup)
@@ -31,6 +31,7 @@ Feel free to use them as desired. No guarantees and I am sure they will have bug
     - [`gh_issue_labels.py`: get/update issue labels in a GH repo](#gh_issue_labelspy-getupdate-issue-labels-in-a-gh-repo)
     - [`gh_refresh_invite.sh`: Refresh pending repo invitations](#gh_refresh_invitesh-refresh-pending-repo-invitations)
     - [`gh_transfer_issues.py`: transfer issues between repos](#gh_transfer_issuespy-transfer-issues-between-repos)
+    - [`gh_unsubscribe.py`: unsubscribe from issue notifications](#gh_unsubscribepy-unsubscribe-from-issue-notifications)
   - [Git Tools](#git-tools)
     - [`git_clone_submissions.py`: batch git cloning](#git_clone_submissionspy-batch-git-cloning)
     - [`git_batch_commit.sh`: bulk commit and push to repos](#git_batch_commitsh-bulk-commit-and-push-to-repos)
@@ -68,8 +69,8 @@ Another tool that one can consider is [gh API CLI](https://github.com/cli/cli) t
 We can run interactively first at development time; for example:
 
 ```shell
->>> import util
->>> g = util.open_gitHub(token_file="/home/ssardina/.ssh/keys/gh-token-ssardina.txt")
+>>> import util, utils_gh
+>>> g = utils_gh.open_gitHub(token_file="/home/ssardina/.ssh/keys/gh-token-ssardina.txt")
 >>> repo = g.get_repo("RMIT-COSC2780-2973-IDM25/workshop-5-ssardina")
 >>> ws = repo.get_workflows()
 >>> ws[0].create_dispatch(ref="main")
@@ -349,6 +350,16 @@ $ python gh_transfer_issues.py  RMIT-COSC2780-2973-IDM25/project-exam-timetablin
 > [!IMPORTANT]
 > Enough permissions are required in both repos, both organizations (to create the temp repo), and in the access token (e.g., to delete the temporary repo).
 
+### `gh_unsubscribe.py`: unsubscribe from issue notifications
+
+When we post a result or feedback to the students' PRs, we get subscribed to the issue/PR, which means we will start receiving any notification for that issue/PR, including any new commit against the PR.
+
+This script allows us to unsubscribe from all the PRs. Usually the Feedback PR is number 1, as it is created by GH classroom when the repos are created, so we can just unsubscribe from those ones:
+
+```shell
+python  gh_unsubscribe.py   -t ~/.ssh/keys/gh-token-ssardina.txt repos.csv --no 1
+```
+
 ## Git Tools
 
 These tools use [GitPython](https://gitpython.readthedocs.io/en/stable/tutorial.html) module to have Git API in Python.
@@ -356,8 +367,8 @@ These tools use [GitPython](https://gitpython.readthedocs.io/en/stable/tutorial.
 We can run interactively first at development time; for example:
 
 ```shell
->>> import util
->>> g = util.open_gitHub(token_file="/home/ssardina/.ssh/keys/gh-token-ssardina.txt")
+>>> import util, utils_gh
+>>> g = utils_gh.open_gitHub(token_file="/home/ssardina/.ssh/keys/gh-token-ssardina.txt")
 >>> repo = g.get_repo("RMIT-COSC2780-2973-IDM25/workshop-5-ssardina")
 >>> ws = repo.get_workflows()
 >>> ws[0].create_dispatch(ref="main")
