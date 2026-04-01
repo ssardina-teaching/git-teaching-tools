@@ -19,22 +19,16 @@ from argparse import ArgumentParser
 from typing import List
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
-from github import Github, Repository, Organization, GithubException
+from github import Github, GithubException
 
 import util, utils_gh
 from util import (
     TIMEZONE,
-    UTC,
-    NOW,
-    NOW_TXT,
     NOW_ISO,
-    LOGGING_DATE,
-    LOGGING_FMT,
     GH_HTTP_URL_PREFIX,
 )
-from datetime import datetime
 
-SCRIPT_NAME = "git_merge_pr"
+SCRIPT_NAME = "gh_merge_pr"
 import logging
 from slogger import setup_logging
 logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)

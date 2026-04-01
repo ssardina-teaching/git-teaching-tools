@@ -15,28 +15,22 @@ PyGithub documentation: https://pygithub.readthedocs.io/en/latest/introduction.h
 Other doc on PyGithub: https://www.thepythoncode.com/article/using-github-api-in-python
 """
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
-__copyright__ = "Copyright 2024-2025"
+__copyright__ = "Copyright 2024-2026"
 
 import csv
 from argparse import ArgumentParser
 import os
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
-from github import Github, Repository, Organization, GithubException
+from github import Github, GithubException
 
 import util, utils_gh
 from util import (
     TIMEZONE,
-    UTC,
-    NOW,
     NOW_ISO,
-    NOW_TXT,
-    LOGGING_DATE,
-    LOGGING_FMT,
-    GH_HTTP_URL_PREFIX,
     backup_file
 )
-SCRIPT_NAME = os.path.basename(__file__)
+SCRIPT_NAME = "gh_pr_check"
 
 import logging
 from slogger import setup_logging
