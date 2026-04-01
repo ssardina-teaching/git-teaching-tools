@@ -1,4 +1,5 @@
 import csv
+import json
 import os
 import shutil
 import git
@@ -153,3 +154,7 @@ def add_csv(csv_file: str, header: list, rows: list, append=True, quoting=csv.QU
             writer.writeheader()
 
         writer.writerows(dict_rows)
+
+
+def format_json(data):
+    return json.dumps(data, indent=4)
