@@ -13,24 +13,21 @@ __copyright__ = "Copyright 2024-2025"
 
 import csv
 from argparse import ArgumentParser
-from typing import List
-from datetime import datetime
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
-from github import Github, Repository, Organization, GithubException
+from github import Github, GithubException
 
 import util, utils_gh
 from util import (
     TIMEZONE,
-    UTC,
-    NOW,
     NOW_ISO,
     NOW_TXT,
     LOGGING_DATE,
     LOGGING_FMT,
-    GH_HTTP_URL_PREFIX,
     add_csv,
 )
+SCRIPT_NAME = "gh_pr_feedback_create"
+
 
 import logging
 import coloredlogs
