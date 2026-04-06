@@ -13,7 +13,6 @@ __copyright__ = "Copyright 2024-2025"
 
 import csv
 from argparse import ArgumentParser
-import json
 from pdb import main
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
