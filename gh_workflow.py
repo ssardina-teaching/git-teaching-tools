@@ -21,17 +21,17 @@ Example:
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2024-2025"
 import csv
-import os
 from argparse import ArgumentParser
 import time
 import util, utils_gh
+from datetime import datetime
+
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Github, Repository, Organization, GithubException, Workflow
 from util import (
     TIMEZONE,
     UTC,
-    NOW,
     NOW_ISO,
     NOW_TXT,
     LOGGING_DATE,
@@ -39,15 +39,14 @@ from util import (
     GH_HTTP_URL_PREFIX,
 )
 
-from datetime import datetime
+SCRIPT_NAME = "gh_workflow"
 
 import logging
-import coloredlogs
-LOGGING_LEVEL = logging.INFO
-# LOGGING_LEVEL = logging.DEBUG
-# logger.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
-logger = logging.getLogger(__name__)
-coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
+from slogger import setup_logging
+
+logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
+logger.setLevel(logging.INFO)  # set the level of the application logger
+logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
 START_CSV = f"workflows-start-{NOW_TXT}.csv"
 JOBS_CSV = f"workflows-jobs-{NOW_TXT}.csv"
@@ -213,7 +212,7 @@ def start_workflow(
                 output_csv.append([repo_id, repo_name, repo_url, "missing_workflow", "", ""])
                 continue
 
-            # we found the workflow, now run it on commit sha   !
+            # -----> We found the workflow! NOW RUN IT ON COMMIT SHA!!!
             result = None
             if workflow_selected is not None:
                 # https://pygithub.readthedocs.io/en/latest/github_objects/Workflow.html
@@ -357,7 +356,7 @@ def get_jobs(
         writer.writerow(JOBS_HEADER_CSV)
         writer.writerows([row for row in output_csv])
 
-    logger.info(f"Results data written to CSV file: {JOBS_CSV}.")
+    logger.info(f"Results data written to CSV file: {JOBS_CSV}")
 
 
 if __name__ == "__main__":
