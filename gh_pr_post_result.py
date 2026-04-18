@@ -135,7 +135,9 @@ if __name__ == "__main__":
     parser.add_argument("MARKING_CSV", help="List of student results.")
     parser.add_argument("CONFIG", help="Python report builder configuration file.")
     parser.add_argument(
-        "REPORT_FOLDER", nargs="?", help="Folder containing student report files."
+        "REPORT_FOLDER", 
+        nargs="?", 
+        help="Folder containing student report files."
     )
     parser.add_argument(
         "-t",
@@ -193,6 +195,8 @@ if __name__ == "__main__":
     # if there is no report folder, then no report posting!
     if args.REPORT_FOLDER is None:
         args.no_report = True
+    else:
+        args.REPORT_FOLDER = Path(args.REPORT_FOLDER)
 
     if not os.path.isfile(args.CONFIG):
         logger.error(f"Feedback builder configuration file {args.CONFIG} not found or not a file.")
@@ -206,7 +210,7 @@ if __name__ == "__main__":
         logger.error(f"Marking CSV file {args.MARKING_CSV} not found.")
         exit(1)
 
-    if args.REPORT_FOLDER and not Path(args.REPORT_FOLDER).is_dir():
+    if args.REPORT_FOLDER and not args.REPORT_FOLDER.is_dir():
         logger.error(
             f"Report folder {args.REPORT_FOLDER} not found or not a directory."
         )
@@ -372,32 +376,26 @@ if __name__ == "__main__":
 
             # First, create a new comment in PR with automarker report (if any)
             if not args.no_report:
-                file_report = os.path.join(
-                    args.REPORT_FOLDER, f"{repo_id}.{args.extension}"
-                )  # default report filename
-                file_report_error = os.path.join(
-                    args.REPORT_FOLDER, f"{repo_id}_ERROR.{args.extension}"
-                )  # default report filename
+                file_report = args.REPORT_FOLDER / f"{repo_id}.{args.extension}"
+                file_report_error = args.REPORT_FOLDER / f"{repo_id}_ERROR.{args.extension}"
                 if "REPORT" in marking_repo:
-                    file_report = os.path.join(
-                        args.REPORT_FOLDER, marking_repo["REPORT"]
-                    )
+                    file_report = args.REPORT_FOLDER / marking_repo["REPORT"]
 
                 # if there is an error report, then use that one
                 error_text = None
-                if os.path.exists(file_report_error):
+                print(file_report)
+                if file_report_error.exists():
                     file_report = file_report_error
                     error_text = (
                         "Your solution seems non-error free as requested in spec... 🥴"
                     )
-
-                if not os.path.exists(file_report):
+                if not file_report.exists():
                     logger.error(
                         f"\t Error in repo {repo_name}: report {file_report} (or _ERROR) not found."
                     )
                     errors_csv.append([repo_id, repo_url, "Report not found"])
                     continue
-                if os.stat(file_report).st_size > 50000:
+                if file_report.stat().st_size > 50000:
                     logger.warning(f"\t Too large automarker report to publish")
                     issue_feedback_comment(
                         pr_feedback,
@@ -405,8 +403,7 @@ if __name__ == "__main__":
                         args.dry_run,
                     )
                 else:
-                    # ok we have a good automarker report to publish now...
-                    with open(os.path.join(file_report), "r") as report:
+                    with open(file_report, "r") as report:
                         report_text = report.read()
 
                     message = f"# Feedback Report ✅\n\n"
