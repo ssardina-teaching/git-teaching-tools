@@ -383,7 +383,6 @@ if __name__ == "__main__":
 
                 # if there is an error report, then use that one
                 error_text = None
-                print(file_report)
                 if file_report_error.exists():
                     file_report = file_report_error
                     error_text = (
