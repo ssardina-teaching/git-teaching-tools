@@ -28,7 +28,7 @@ The script requires:
 Example:
 
 $ python ../tools/git-teaching-tools.git/gh_pr_post_result.py repos.csv marking.csv feedback_p2.py reports -t ~/.ssh/keys/gh-token-ssardina.txt --repos ssardina
- 
+
 The feedback builder (file pr_message.py in the example) must define the following functions:
 
 - report_feedback(mapping): function to generate the feedback message
@@ -40,6 +40,7 @@ The `mapping` is a dictionary with the marking information for the repo, represe
 
 For example on feedback builders see feedback_p2.py in this folder
 """
+
 __author__ = "Sebastian Sardina & Andrew Chester - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2024-2025"
 import os
@@ -67,12 +68,14 @@ from util import (
     NOW_TXT,
     LOGGING_DATE,
     LOGGING_FMT,
-    add_csv
+    add_csv,
 )
+
 SCRIPT_NAME = "pr_post_result"
 
 import logging
 from slogger import setup_logging
+
 logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
 logger.setLevel(logging.INFO)  # set the level of the application logger
 logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
@@ -110,7 +113,7 @@ def load_marking_dict(file_path: str, col_key="GHU") -> dict:
     df.dropna(subset=[col_key], inplace=True)
     df.drop_duplicates(subset=[col_key], keep="last", inplace=True)
     df = df.replace(np.nan, "")
-    df[col_key] = df[col_key].str.lower()   # set the key column to lower case
+    df[col_key] = df[col_key].str.lower()  # set the key column to lower case
     df.set_index(col_key, inplace=True)
     df = df.round(2)
     comment_dict = df.to_dict(orient="index")
@@ -120,7 +123,9 @@ def load_marking_dict(file_path: str, col_key="GHU") -> dict:
     return comment_dict
 
 
-def issue_feedback_comment(pr: Issue, message: str, dry_run=False) -> IssueComment|None:
+def issue_feedback_comment(
+    pr: Issue, message: str, dry_run=False
+) -> IssueComment | None:
     if dry_run:
         print("=" * 80)
         print(message)
@@ -135,9 +140,7 @@ if __name__ == "__main__":
     parser.add_argument("MARKING_CSV", help="List of student results.")
     parser.add_argument("CONFIG", help="Python report builder configuration file.")
     parser.add_argument(
-        "REPORT_FOLDER", 
-        nargs="?", 
-        help="Folder containing student report files."
+        "REPORT_FOLDER", nargs="?", help="Folder containing student report files."
     )
     parser.add_argument(
         "-t",
@@ -156,14 +159,22 @@ if __name__ == "__main__":
         help="if given, only the teams specified will be parsed (Default: %(default)s).",
     )
     parser.add_argument(
-        "--start",  
+        "--start",
         "-s",
         type=int,
         default=1,
         help="repo no to start processing from (Default: %(default)s).",
     )
-    parser.add_argument("--end", "-e", type=int, help="repo no to end processing.")
-    parser.add_argument("--batch", "-b", help="batch to post (column BATCH, if any).")
+    parser.add_argument(
+        "--end", 
+        "-e", 
+        type=int, 
+        help="repo no to end processing.")
+    parser.add_argument(
+        "--batch", 
+        "-b", 
+        type=str,
+        help="batch to post (column BATCH, if any).")
     parser.add_argument(
         "--extension",
         "-ext",
@@ -199,7 +210,9 @@ if __name__ == "__main__":
         args.REPORT_FOLDER = Path(args.REPORT_FOLDER)
 
     if not os.path.isfile(args.CONFIG):
-        logger.error(f"Feedback builder configuration file {args.CONFIG} not found or not a file.")
+        logger.error(
+            f"Feedback builder configuration file {args.CONFIG} not found or not a file."
+        )
         exit(1)
 
     if not os.path.isfile(args.REPO_CSV):
@@ -222,25 +235,21 @@ if __name__ == "__main__":
         )
         exit(1)
 
-    if (args.start != 1 or args.end) is not None and (args.repos or args.ignore):
+    if (args.start != 1 or args.end) is not None and (args.repos or args.ignore or args.batch):
         logger.error(
-            f"Cannot use --start/--end and --repos/--ignore at the same time. Please check your options."
+            f"Cannot use --start/--end and --repos/--ignore/--batch at the same time. Please check your options."
         )
         exit(1)
 
     if (args.start < 1) or (args.end and args.start > args.end):
-        logger.error(
-            f"Start number has to be 1+ and less than --end."
-        )
+        logger.error(f"Start number has to be 1+ and less than --end.")
         exit(1)
 
     ###############################################
     # Load feedback report builder module and marking spreadsheet
     # https://medium.com/@Doug-Creates/dynamically-import-a-module-by-full-path-in-python-bbdf4815153e
     ###############################################
-    spec = importlib.util.spec_from_file_location(
-        "module_name", args.CONFIG
-    )
+    spec = importlib.util.spec_from_file_location("module_name", args.CONFIG)
     module_feedback = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module_feedback)
     # Add the module to sys.modules
@@ -262,10 +271,15 @@ if __name__ == "__main__":
     marking_dict = load_marking_dict(args.MARKING_CSV, col_key=args.ghu)
 
     ###############################################
-    # Filter repos as requested
+    # Filter repos as requested:
+    #
+    #   - if --repos is given or get_repos(), only those repos will be processed
+    #   - if --batch is given, only the repos with that batch in the marking
+    #   - if --start and/or --end is given, only the repos in that range will be processed
     ###############################################
-    # get the specific repos to process (if any)
+    # get the specific repos that are to be processed (if any)
     repos_process = args.repos or get_repos()
+
     # get all the repos available in the repo CSV database
     repos = util.get_repos_from_csv(
         args.REPO_CSV,
@@ -273,24 +287,30 @@ if __name__ == "__main__":
         args.ignore,
     )
 
-    # TODO: start and end clashes badly if ignore, repos, or get_repos are used
-    # only allow --start and --end if no repos or ignore are given
-    start_no = 1 
+    # if --batch used, filter repos
+    repos = [r for r in repos if r["REPO_ID_SUFFIX"].lower() in marking_dict]
+    if args.batch is not None:
+        repos = [
+            x
+            for x in repos
+            if marking_dict[x["REPO_ID_SUFFIX"].lower()]["BATCH"] == args.batch
+        ]
+
+    start_no = 1
     end_no = len(repos)
-    if repos_process is None:
+
+    # only allow --start and --end if no other filtering used
+    if repos_process is None and args.batch is None and not args.ignore:
         start_no = args.start if args.start is not None else 1
         end_no = args.end if args.end is not None else len(repos)
         logger.info(f"Getting repos {start_no} to {end_no}")
         repos = repos[args.start - 1 : end_no]
 
     if len(repos) == 0:
-        logger.error(f'No relevant repos found in the mapping file "{args.REPO_CSV}". Stopping.')
+        logger.error(
+            f'No relevant repos found in the mapping file "{args.REPO_CSV}". Stopping.'
+        )
         exit(0)
-
-    # filter repos by batch if requested
-    repos = [r for r in repos if r["REPO_ID_SUFFIX"].lower() in marking_dict]
-    if args.batch is not None:
-        repos = [x for x in repos if marking_dict[x["REPO_ID_SUFFIX"].lower()]['BATCH'] == args.batch]
 
     logger.info(f"Number of relevant repos found: {len(repos)}")
 
@@ -360,10 +380,14 @@ if __name__ == "__main__":
 
             # First, should we skip submission it for any reason?
             # (e.g., no certification/submission/marking, audit)
-            message, skip, skip_reason = check_submission(repo_id, marking_repo, args.batch, logger)
+            message, skip, skip_reason = check_submission(
+                repo_id, marking_repo, args.batch, logger
+            )
             if message is not None:
                 issue_feedback_comment(pr_feedback, message, args.dry_run)
-                logger.info(f"\t Feedback warning/error posted to {pr_feedback.html_url}.")
+                logger.info(
+                    f"\t Feedback warning/error posted to {pr_feedback.html_url}."
+                )
                 if not args.dry_run:
                     posted_csv.append(
                         [repo_id, repo_url, pr_feedback.html_url, skip_reason]
@@ -377,7 +401,9 @@ if __name__ == "__main__":
             # First, create a new comment in PR with automarker report (if any)
             if not args.no_report:
                 file_report = args.REPORT_FOLDER / f"{repo_id}.{args.extension}"
-                file_report_error = args.REPORT_FOLDER / f"{repo_id}_ERROR.{args.extension}"
+                file_report_error = (
+                    args.REPORT_FOLDER / f"{repo_id}_ERROR.{args.extension}"
+                )
                 if "REPORT" in marking_repo:
                     file_report = args.REPORT_FOLDER / marking_repo["REPORT"]
 
