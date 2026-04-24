@@ -74,8 +74,6 @@ def get_repos_from_csv(csv_file, repos_ids=None, ignore_ids=None) -> list[dict]:
     return repos
 
 
-
-
 def get_tag_info(repo: git.Repo, tag_str="head"):
     """
     Returns the information of a tag in a repo. By default the head
@@ -158,3 +156,13 @@ def add_csv(csv_file: str, header: list, rows: list, append=True, quoting=csv.QU
 
 def format_json(data):
     return json.dumps(data, indent=4)
+
+
+def parse_full_repo(name: str):
+    """
+    Parse 'org/repo' into (org, repo).
+    """
+    if "/" not in name:
+        raise Exception("Repository must be in format 'org/repo'")
+    org, repo = name.split("/")
+    return org, repo

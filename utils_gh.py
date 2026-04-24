@@ -1,10 +1,11 @@
-import base64
 import sys
+import requests
+from typing import Optional
 from github import Github, Auth
 from github.GithubException import GithubException
 from github.Repository import Repository
-from typing import Optional
 
+TOKEN = None  # set in main
 
 def read_token(token_file):
     with open(token_file, "r") as f:
@@ -27,6 +28,7 @@ def get_token(token_str: str, token_file: str) -> str:
 
 
 def open_gitHub(token_file=None, token=None, user=None, password=None) -> Github:
+    global TOKEN
     # Authenticate to GitHub
     if token:
         auth = Auth.Token(token)
@@ -38,47 +40,19 @@ def open_gitHub(token_file=None, token=None, user=None, password=None) -> Github
         g = Github(user, password)
     else:
         raise Exception("No authentication provided, quitting....")
+
+    # set global TOKEN for GraphQL queries
+    TOKEN = token
+
     return g
-
-
-def print_repo_info(repo: Repository):
-    # repository full name
-    print("Full name:", repo.full_name)
-    # repository description
-    print("Description:", repo.description)
-    # the date of when the repo was created
-    print("Date created:", repo.created_at)
-    # the date of the last git push
-    print("Date of last push:", repo.pushed_at)
-    # home website (if available)
-    print("Home Page:", repo.homepage)
-    # programming language
-    print("Language:", repo.language)
-    # number of forks
-    print("Number of forks:", repo.forks)
-    # number of stars
-    print("Number of stars:", repo.stargazers_count)
-    print("-" * 50)
-    # repository content (files & directories)
-    print("Contents:")
-    for content in repo.get_contents(""):
-        print(content)
-    try:
-        # repo license
-        print(
-            "License:", base64.b64decode(repo.get_license().content.encode()).decode()
-        )
-    except:
-        pass
 
 
 def get_issue_node_id(g: Github, repo: Repository, issue_number: int) -> Optional[str]:
     """Get the GraphQL node ID for a given issue or PR, identified by its number."""
-    
     try:
         # GET /repos/{owner}/{repo}/issues/{issue_number}
         response, data = g.requester.requestJsonAndCheck(
-            "GET", 
+            "GET",
             f"/repos/{repo.full_name}/issues/{issue_number}"
         )
         # Extract the global GraphQL node ID
@@ -130,7 +104,7 @@ def is_subscribed(g: Github, repo: Repository, pr_number: int) -> bool:
 
 def set_subscription(g: Github, thread_id: str, subscribe: bool) -> dict:
     """Set the subscription status for a given notification thread.
-    
+
     I don't know why unsubscribing cannot be achived with {"subscribed": False} but instead requires {"ignored": True} (ignoring is stronger!)
     """
     input = {"subscribed": True} if subscribe else {"ignored": True}
@@ -148,3 +122,69 @@ def get_subscription(g: Github, thread_id: str) -> dict:
         f"/notifications/threads/{thread_id}/subscription",
     )
     return data
+
+
+#######################################
+# GitHub GraphQL API helper functions
+#######################################
+
+
+def run_query(query, variables=None):
+    """Generic function to execute GraphQL queries.
+    https://docs.github.com/en/graphql/overview/about-the-graphql-api
+    """
+    HEADERS = {"Authorization": f"bearer {TOKEN}"}
+    URL = "https://api.github.com/graphql"
+
+    query = {"query": query, "variables": variables}
+    response = requests.post(URL, json=query, headers=HEADERS)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"Query failed: {response.status_code}. {response.text}")
+
+
+def get_repository_node_id(owner, name):
+    """Fetches the unique Node ID for a repository."""
+    query = """
+    query GetRepositoryNodeId($owner: String!, $name: String!) {
+      repository(owner: $owner, name: $name) { id }
+    }
+    """
+    result = run_query(query, {"owner": owner, "name": name})
+    return result["data"]["repository"]["id"]
+
+
+def get_issues(owner, name, closed=False):
+    """Fetches a list of all open issue Node IDs from the source repo."""
+    if not closed:
+        query = """
+        query($owner: String!, $name: String!) {
+        repository(owner: $owner, name: $name) {
+            issues(states: OPEN, first: 100) {
+            nodes {
+                id
+                number
+                title
+            }
+            }
+        }
+        }
+        """
+    else:
+        query = """
+        query($owner: String!, $name: String!) {
+        repository(owner: $owner, name: $name) {
+            issues(first: 100) {
+            nodes {
+                id
+                number
+                title
+                state
+            }
+            }
+        }
+        }
+        """
+    result = run_query(query, {"owner": owner, "name": name})
+    return result["data"]["repository"]["issues"]["nodes"]

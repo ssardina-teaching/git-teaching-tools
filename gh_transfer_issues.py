@@ -29,7 +29,6 @@ $ python gh_transfer_issues.py  RMIT-COSC2780-2973-IDM25/project-exam-timetablin
 import argparse
 import time
 import requests
-import gh_utils
 from github.GithubException import GithubException
 
 import logging
@@ -58,7 +57,7 @@ def transfer_issue(issue_id, target_repo_id):
     }
     """
     logger.debug(f"Running mutation to transfer issue {issue_id} to repo {target_repo_id} on mutation: {mutation}")
-    return gh_utils.run_query(mutation, {"issueId": issue_id, "repositoryId": target_repo_id})
+    return utils_gh.run_query(mutation, {"issueId": issue_id, "repositoryId": target_repo_id})
 
 
 def transfer_issues(repo1, repo2, closed=False):
@@ -67,9 +66,9 @@ def transfer_issues(repo1, repo2, closed=False):
 
     # 1. Get IDs
     try:
-        # repo1_id = gh_utils.get_repository_node_id(org1, name1)
-        repo2_id = gh_utils.get_repository_node_id(org2, name2)
-        issues = gh_utils.get_issues(org1, name1, closed=closed)
+        # repo1_id = utils_gh.get_repository_node_id(org1, name1)
+        repo2_id = utils_gh.get_repository_node_id(org2, name2)
+        issues = utils_gh.get_issues(org1, name1, closed=closed)
     except Exception as e:
         raise Exception(f"❌ Initialization of issue transferring failed: {e}")
 
@@ -128,11 +127,12 @@ def main():
         "--token-file", "-t", required=True, help="File containing GitHub token"
     )
     args = parser.parse_args()
+    logger.info(args)
 
     source_repo_full = args.SOURCE_REPO
     dest_repo_full = args.DEST_REPO
-    source_org_name, source_repo_name = gh_utils.parse_full_repo(source_repo_full)
-    dest_org_name, dest_repo_name = gh_utils.parse_full_repo(dest_repo_full)
+    source_org_name, source_repo_name = util.parse_full_repo(source_repo_full)
+    dest_org_name, dest_repo_name = util.parse_full_repo(dest_repo_full)
 
     same_org = False
     if source_org_name == dest_org_name:
