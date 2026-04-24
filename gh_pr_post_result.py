@@ -47,9 +47,6 @@ import os
 from argparse import ArgumentParser
 from pathlib import Path
 import traceback
-from typing import List
-from datetime import datetime
-from zoneinfo import ZoneInfo  # this should work Python 3.9+
 from github import GithubException
 import importlib.util
 import sys
