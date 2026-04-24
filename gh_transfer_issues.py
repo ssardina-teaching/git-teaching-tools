@@ -34,7 +34,10 @@ from github.GithubException import GithubException
 
 import logging
 from slogger import setup_logging
-import util, utils_gh
+import util
+import utils_gh
+
+
 logger = setup_logging("transfer_repo", rotating_file="teaching.log", indent=2)
 logger.setLevel(logging.INFO)  # set the level of the application logger
 # logger.setLevel(logging.DEBUG)  # set the level of the application logger
@@ -136,18 +139,14 @@ def main():
         same_org = True
 
     ###############################################
-    # 0. Authenticate to GitHub
+    # Authenticate to GitHub
     ###############################################
-    gh_token = util.read_token(args.token_file)
-    gh_utils.TOKEN = gh_token  # Set the token for util functions
-    HEADERS = {"Authorization": f"token {gh_token}"}
-
-    if not args.token_file and not (args.user or args.password):
-        logger.error("No authentication provided, quitting....")
+    if not args.token_file:
+        logger.error("No token file for authentication provided, quitting....")
         exit(1)
     try:
-        gh = gh_utils.open_gitHub(token_file=args.token_file)
-    except Exception:
+        gh = utils_gh.open_gitHub(token_file=args.token_file)
+    except:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."
         )
