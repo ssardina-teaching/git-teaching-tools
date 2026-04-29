@@ -435,7 +435,7 @@ if __name__ == "__main__":
                     if error_text is not None:
                         message += f"\n**NOTE**: {error_text}"
                     if FEEDBACK_REPORT_AFTER is not None:
-                        message += f"\n{FEEDBACK_REPORT_AFTER}"
+                        message += f"\n\n{FEEDBACK_REPORT_AFTER}"
                     issue_feedback_comment(pr_feedback, message, args.dry_run)
 
             # Second, create COMMENT with the feedback summary
