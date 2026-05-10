@@ -152,6 +152,7 @@ def main():
         )
         exit(1)
 
+
     # not really needed.... but we can check if the repos exist and we have access to them before starting the transfer
     try:
         gh.get_repo(source_repo_full)
@@ -200,7 +201,7 @@ def main():
             f"https://api.github.com/repos/{source_org_name}/temp/transfer"
         )
         response = requests.post(
-            transfer_url, headers=HEADERS, json={"new_owner": dest_org_name}
+            transfer_url, headers={"Authorization": f"token {utils_gh.TOKEN}"}, json={"new_owner": dest_org_name}
         )
         if response.status_code not in (202, 201):
             raise RuntimeError(f"Repo transfer failed: {response.text}")
