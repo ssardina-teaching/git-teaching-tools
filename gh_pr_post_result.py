@@ -143,30 +143,38 @@ if __name__ == "__main__":
         "-t",
         "--token-file",
         required=True,
+        metavar="PATH",
         help="File containing GitHub authorization token/password.",
     )
     parser.add_argument(
-        "--repos", nargs="+", help="if given, only the teams specified will be parsed."
+        "--repos",
+        nargs="+",
+        metavar="STR",
+        help="if given, only the teams specified will be parsed.",
     )
-    parser.add_argument("--ignore", nargs="+", help="if given, ignore these repos.")
+    parser.add_argument(
+        "--ignore", 
+        nargs="+", 
+        metavar="STR",
+        help="if given, ignore these repos.")
     parser.add_argument(
         "--ghu",
         type=str,
         default="GHU",
-        help="if given, only the teams specified will be parsed (Default: %(default)s).",
+        metavar="STR",
+        help="Column name in marking spreadsheet identifying repositories, e.g., GHU or GH-TEAMS (Default: %(default)s).",
     )
     parser.add_argument(
         "--start",
         "-s",
         type=int,
         default=1,
+        metavar="INT",
         help="repo no to start processing from (Default: %(default)s).",
     )
     parser.add_argument(
-        "--end", 
-        "-e", 
-        type=int, 
-        help="repo no to end processing.")
+        "--end", "-e", type=int, metavar="INT", help="repo no to end processing."
+    )
     parser.add_argument(
         "--batch", 
         "-b", 
@@ -175,6 +183,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--extension",
         "-ext",
+        metavar="STR",
         default="txt",
         help="Extension of report file (Default: %(default)s).",
     )
@@ -286,6 +295,10 @@ if __name__ == "__main__":
 
     # if --batch used, filter repos
     repos = [r for r in repos if r["REPO_ID_SUFFIX"].lower() in marking_dict]
+    # make BATCH column a string (in case it is a number) to avoid problems with comparison
+    for k in marking_dict:
+        if type(marking_dict[k]["BATCH"]) == float:
+            marking_dict[k]["BATCH"] = str(int(marking_dict[k]["BATCH"]))
     if args.batch is not None:
         repos = [
             x
