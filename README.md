@@ -10,39 +10,6 @@ They are almost all Python-based script, using two API libraries:
 > [!CAUTION]
 > These scripts are provided as-is and may contain bugs or outdated code. Use them at your own risk. If you found a bug, open an issue or PR as needed.  😉
 
-- [Teaching scripts](#teaching-scripts)
-  - [Setup](#setup)
-  - [GitHub Scripts](#github-scripts)
-    - [Manual testing at development](#manual-testing-at-development)
-    - [`gh_classroom_collect.py`: collect repos from a GH Organizations](#gh_classroom_collectpy-collect-repos-from-a-gh-organizations)
-    - [`gh_authors_collect.py`: extract commits per author](#gh_authors_collectpy-extract-commits-per-author)
-    - [`gh_create_wiki.py`: push Wiki template to list of repos](#gh_create_wikipy-push-wiki-template-to-list-of-repos)
-    - [`gh_member_bulk_team.py`: add/delete GH username to GH teams](#gh_member_bulk_teampy-adddelete-gh-username-to-gh-teams)
-    - [`gh_pr_merge.py`: bulk merge of PRs](#gh_pr_mergepy-bulk-merge-of-prs)
-    - [`gh_pr_feedback_create.py`: create Feedback PRs](#gh_pr_feedback_createpy-create-feedback-prs)
-    - [`gh_pr_check_merged_forced.py`: check for merged PR and forced pushes](#gh_pr_check_merged_forcedpy-check-for-merged-pr-and-forced-pushes)
-    - [`gh_pr_post_result.py`: push comments to repo's PRs](#gh_pr_post_resultpy-push-comments-to-repos-prs)
-    - [`gh_pr_post_comment.py`: push a message to PRs](#gh_pr_post_commentpy-push-a-message-to-prs)
-    - [`gh_workflow.py`: run automarking workflow](#gh_workflowpy-run-automarking-workflow)
-    - [`gh_commit_after.py`: get commits after a date](#gh_commit_afterpy-get-commits-after-a-date)
-    - [`gh_tag_after.py`: get repos with a given task after a date](#gh_tag_afterpy-get-repos-with-a-given-task-after-a-date)
-    - [`ghc_build_reporter.py`: build YAML classroom reporter](#ghc_build_reporterpy-build-yaml-classroom-reporter)
-    - [`gh_user_access.py`: get repos and accesses of org](#gh_user_accesspy-get-repos-and-accesses-of-org)
-    - [`gh_issue_labels.py`: get/update issue labels in a GH repo](#gh_issue_labelspy-getupdate-issue-labels-in-a-gh-repo)
-    - [`gh_refresh_invite.sh`: Refresh pending repo invitations](#gh_refresh_invitesh-refresh-pending-repo-invitations)
-    - [`gh_transfer_issues.py`: transfer issues between repos](#gh_transfer_issuespy-transfer-issues-between-repos)
-    - [`gh_unsubscribe.py`: unsubscribe from issue notifications](#gh_unsubscribepy-unsubscribe-from-issue-notifications)
-  - [Git Tools](#git-tools)
-    - [`git_clone_submissions.py`: batch git cloning](#git_clone_submissionspy-batch-git-cloning)
-    - [`git_batch_commit.sh`: bulk commit and push to repos](#git_batch_commitsh-bulk-commit-and-push-to-repos)
-    - [`git_revert.py`: revert commits done late](#git_revertpy-revert-commits-done-late)
-  - [Google Scripts](#google-scripts)
-    - [`gg_get_worksheet.py`: download Google Sheet worksheet as CSV file](#gg_get_worksheetpy-download-google-sheet-worksheet-as-csv-file)
-    - [`gg_sheet_submissions.py`: download submissions from Google Sheets](#gg_sheet_submissionspy-download-submissions-from-google-sheets)
-    - [`gg_drive_download.py`: download files in Drive folder](#gg_drive_downloadpy-download-files-in-drive-folder)
-  - [Useful shell commands](#useful-shell-commands)
-  - [Contributors](#contributors)
-
 ## Setup
 
 To install all requirements run this in your Python virtual environment:
@@ -58,23 +25,59 @@ The libraries used are:
 - gitpython: <http://www.legendu.net/misc/blog/hands-on-GitPython/>
 - gh API CLI tool: <https://github.com/cli/cli> ([manual](https://cli.github.com/manual/))
 
-## GitHub Scripts
+### GitHub Tools
 
 These `gh_xxx.py` scripts mostly use [PyGithub](https://github.com/PyGithub/PyGithub). Scripts will require a GitHub access token that allows access the corresponding repos/organization.
 
 Another tool that one can consider is [gh API CLI](https://github.com/cli/cli) tool; see the [manual](https://cli.github.com/manual/).
 
-### Manual testing at development
 
-We can run interactively first at development time; for example:
+| Script                         | Description                                                        |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `gh_classroom_collect.py`      | Collect repos from a GH Organization for a given assignment prefix |
+| `gh_authors_collect.py`        | Extract number of commits per author per repo                      |
+| `gh_create_wiki.py`            | Push a Wiki template to a list of repos                            |
+| `gh_member_bulk_team.py`       | Add/delete a GH username to GH teams in an organization            |
+| `gh_pr_merge.py`               | Bulk merge of PRs across repos                                     |
+| `gh_pr_feedback_create.py`     | Create Feedback PRs missing from GitHub Classroom                  |
+| `gh_pr_check_merged_forced.py` | Check for merged PRs and forced pushes                             |
+| `gh_pr_post_result.py`         | Push feedback/results as comments to repos' PRs                    |
+| `gh_pr_post_comment.py`        | Push a custom message to PRs                                       |
+| `gh_workflow.py`               | Start, inspect, or delete automarking workflow runs                |
+| `gh_commits_after.py`          | Get commits after a given date                                     |
+| `gh_tags_after.py`             | Get repos with a given tag after a date                            |
+| `ghc_build_reporter.py`        | Build YAML autograding-reporter section from test definitions      |
+| `gh_user_access.py`            | List repos in an org and their contributors with access levels     |
+| `gh_issue_labels.py`           | Get or update issue labels in a GH repo                            |
+| `gh_refresh_invite.sh`         | Refresh pending repo invitations by deleting and re-inviting       |
+| `gh_transfer_issues.py`        | Transfer issues between repos in different organizations           |
+| `gh_unsubscribe.py`            | Unsubscribe from issue/PR notifications                            |
 
-```shell
->>> import util, utils_gh
->>> g = utils_gh.open_gitHub(token_file="/home/ssardina/.ssh/keys/gh-token-ssardina.txt")
->>> repo = g.get_repo("RMIT-COSC2780-2973-IDM25/workshop-5-ssardina")
->>> ws = repo.get_workflows()
->>> ws[0].create_dispatch(ref="main")
-```
+### Git Tools
+
+| Script                     | Description                                    |
+| -------------------------- | ---------------------------------------------- |
+| `git_clone_submissions.py` | Batch clone student repos from a CSV list      |
+| `git_batch_commit.sh`      | Bulk commit and push changes to multiple repos |
+| `git_revert.py`            | Revert commits made after a deadline           |
+
+### Google Scripts
+
+| Script                    | Description                                     |
+| ------------------------- | ----------------------------------------------- |
+| `gg_get_worksheet.py`     | Download a Google Sheet worksheet as a CSV file |
+| `gg_sheet_submissions.py` | Download submissions from Google Sheets         |
+| `gg_drive_download.py`    | Download files from a Google Drive folder       |
+
+### Other Tools
+
+| Script                | Description                                     |
+| --------------------- | ----------------------------------------------- |
+| `gen_code_page.py`    | Generate PDF with attendance codes for printout |
+| `git_batch_commit.py` | Batch commit to multiple repos                  |
+|                       |                                                 |
+
+## OLD DOCUMENATION
 
 ### `gh_classroom_collect.py`: collect repos from a GH Organizations
 
@@ -471,31 +474,6 @@ python ./gg_drive_download.py 1mttf61NwuFNY25idwWw5AKzV3tQQbwlMp980i-9vnkK3PIV4o
 
 This script is a new and simpler version of the one in [this repo](https://github.com/ssardina-teaching/google-assignment-submission).
 
-## Useful shell commands
-
-Once all git repos have been cloned in `git-submissions/`, one can build zip files from the submissions into directory `zip-submissions/` as follows:
-
-```bash
-for d in git-submissions-p2/*; do echo "============> Processing ${d}" ; zip -q -j "./zip-submissions-p2/`basename "$d.zip"`" "${d}"/p2-multiagent/* ;done
-```
-
-or for the final CTF project:
-
-```bash
-for d in git-submissions-p4/*; do echo "============> Processing ${d}" ; zip -q -j "./zip-submissions-p4/`basename "$d.zip"`" "${d}"/pacman-contest/* ;done
-```
-
-To count the number of commits between dates:
-
-```bash
-git log --after="2018-03-26T00:00:00+11:00" --before="2018-03-28T00:00:00+11:00" | grep "Date:" | wc -l
-```
-
-To copy just the new zip files:
-
-```bash
-rsync  -avt --ignore-existing  zip-submissions-p4/*.zip AI18-assessments/project-4/zip-submissions/
-```
 
 ## Contributors
 
