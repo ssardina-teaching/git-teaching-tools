@@ -10,6 +10,12 @@ They are almost all Python-based script, using two API libraries:
 > [!CAUTION]
 > These scripts are provided as-is and may contain bugs or outdated code. Use them at your own risk. If you found a bug, open an issue or PR as needed.  😉
 
+Other repos containing similar tools are:
+
+- https://github.com/danwallach/github-classroom-utils
+- https://github.com/ccannon94/github-classroom-utilties
+- GitHub Classroom CLI: https://github.com/github/gh-classroom
+
 ## Setup
 
 To install all requirements run this in your Python virtual environment:
