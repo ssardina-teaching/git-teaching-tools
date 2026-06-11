@@ -7,3 +7,4 @@ google-auth-oauthlib
 gsheets
 PyDrive2
 coloredlogs
+git+https://github.com/ssardina/slogger.git
