@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Copy marking results into each submission's repository."""
+"""Copy marking results into each submission's repository.
+
+e.g.:
+
+    $ python copy_bulk_submissions.py asp-automarker.git/results/idm26/01-slots-f1 submissions marking --preserve
+
+    or
+
+    $ python copy_bulk_submissions.py asp-automarker.git/results/idm26/01-slots-f1 submissions marking/test-01
+"""
 
 import argparse
 import shutil
@@ -24,6 +33,11 @@ def parse_args():
         "marking",
         help="Relative folder name inside each submission repo where results will be copied.",
     )
+    parser.add_argument(
+        "-p", "--preserve",
+        action="store_true",
+        help="Preserve basename of the result folder.",
+    )
     return parser.parse_args()
 
 
@@ -32,7 +46,9 @@ def main():
 
     results_dir = args.results.resolve()
     submissions_dir = args.submissions.resolve()
-    marking_rel = args.marking
+    dest_folder = Path(args.marking)
+    if args.preserve:
+        dest_folder = dest_folder / results_dir.name
 
     if not results_dir.is_dir():
         raise SystemExit(f"Results directory not found: {results_dir}")
@@ -58,7 +74,7 @@ def main():
             skipped += 1
             continue
 
-        dest = submission_dir / marking_rel
+        dest = submission_dir / dest_folder
 
         if dest.exists():
             if skip_all:
@@ -70,14 +86,16 @@ def main():
                 if answ == "y":
                     overwrite_all = True
                 elif answ == "s":
-                    skip_all = True 
+                    skip_all = True
+                    continue
                 else:
                     exit(1)
             print(f"[OVERWRITE] {submission_name}: removing existing '{dest}'")
             shutil.rmtree(dest)
 
-        shutil.copytree(result_folder, dest)
         print(f"[OK] {submission_name}: copied '{result_folder}' -> '{dest}'")
+        exit(1)
+        shutil.copytree(result_folder, dest)
         copied += 1
 
     print(f"\nDone: {copied} copied, {skipped} skipped.")
