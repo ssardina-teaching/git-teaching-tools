@@ -94,7 +94,6 @@ def main():
             shutil.rmtree(dest)
 
         print(f"[OK] {submission_name}: copied '{result_folder}' -> '{dest}'")
-        exit(1)
         shutil.copytree(result_folder, dest)
         copied += 1
 
