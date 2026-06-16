@@ -100,6 +100,7 @@ $ python ./gh_classroom_collect.py -t ~/.ssh/keys/gh-token-ssardina.txt RMIT-COS
 | `gen_code_page.py`         | Generate PDF with attendance codes for printout |
 | `git_batch_commit.py`      | Batch commit to multiple repos                  |
 | `copy_bulk_submissions.py` | Copy folders to submissions                     |
+| `push_marking.sh`          | Push marking folder to submission repos         |
 
 
 ## Contributors
