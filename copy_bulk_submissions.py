@@ -47,6 +47,7 @@ def main():
     copied = 0
     skipped = 0
     overwrite_all = False
+    skip_all = False
 
     for result_folder in result_folders:
         submission_name = result_folder.name
@@ -60,11 +61,16 @@ def main():
         dest = submission_dir / marking_rel
 
         if dest.exists():
+            if skip_all:
+                print(f"[SKIP] {submission_name}: '{dest}' already exists (skipping all).")
+                continue
             if not overwrite_all:
                 print(f"[WARNING] {submission_name}: '{dest}' already exists.")
-                answ = input("Overwrite this and ALL from now on? [y/N] ").strip().lower()
+                answ = input("Overwrite or skip this and ALL existing from now on? [y/s] ").strip().lower()
                 if answ == "y":
                     overwrite_all = True
+                elif answ == "s":
+                    skip_all = True 
                 else:
                     exit(1)
             print(f"[OVERWRITE] {submission_name}: removing existing '{dest}'")
