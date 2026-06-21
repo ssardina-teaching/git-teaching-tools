@@ -454,7 +454,7 @@ def get_jobs(
 
                         logger.info(f"Points obtained from annotation: {total_points}/{max_points}", depth=4)
 
-                annotations = ", ".join([f"{ann.annotation_level}: {ann.message}" for ann in check_run.get_annotations()])
+                annotations = "; ".join([f"{ann.annotation_level}: {ann.message}" for ann in check_run.get_annotations()])
 
             # generate dict row for CSV output
             wrkflow_job = {
