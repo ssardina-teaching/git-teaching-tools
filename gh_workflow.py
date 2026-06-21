@@ -380,7 +380,12 @@ def get_jobs(
                     None,
                 )   # type: ignore
             else:
-                wrkflow_run = wrkflow_runs[0] if wrkflow_runs.totalCount > 0 else None
+                # default to last run (first in list)
+                wrkflow_run = (
+                    wrkflow_runs[0]
+                    if wrkflow_runs.totalCount > 0
+                    else None   #type: ignore
+                )
 
             # 3. We have the specific RUN, now get its FIRST (and only!) job
             if wrkflow_run is None:
@@ -527,7 +532,7 @@ if __name__ == "__main__":
         help="name of the YAML workflow (e.g., 'Autograding').")
     parser.add_argument(
         "--run-name",
-        help="name of the run (e.g., 'Augrading end week June 20th 2026'; if not default to first run).")
+        help="name of the run (e.g., 'Augrading end week June 20th 2026'; default to last run).")
     parser.add_argument(
         "--commit",
         default="main",
