@@ -23,6 +23,7 @@ __copyright__ = "Copyright 2024-2025"
 import csv
 from argparse import ArgumentParser
 from pathlib import Path
+import re
 import time
 
 from github.PaginatedList import PaginatedList
@@ -31,7 +32,7 @@ from datetime import datetime
 
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
-from github import Github, Repository, Organization, GithubException, Workflow, WorkflowRun
+from github import Github, Repository, Organization, GithubException, Workflow, WorkflowJob, WorkflowRun
 from util import (
     TIMEZONE,
     UTC,
@@ -104,7 +105,7 @@ def delete_workflow(
         for w in repo.get_workflows():
             if wrk_name in w.name:
                 wrkflow = w
-                logger.info(f"\t Found workflow ({w})")
+                logger.info(f"Found workflow ({w})", depth=2)
                 break
         if wrkflow is None:
             logger.error(f"\t Workflow *{wrk_name}* not in {repo_name}.")
@@ -117,14 +118,15 @@ def delete_workflow(
                 continue
             if wr.created_at > until_dt.astimezone(UTC):
                 logger.info(
-                    f"\t Workflow #{wr.run_number} run {wr.name} - {wr.created_at.astimezone(TIMEZONE)} - {wr.html_url} - deleting it..."
+                    f"Workflow #{wr.run_number} run {wr.name} - {wr.created_at.astimezone(TIMEZONE)} - {wr.html_url} - deleting it...",
+                    depth=2
                 )
                 if not dry_run:
                     no_deleted += 1
                     try:
                         wr.delete()
                     except GithubException as e:
-                        logger.error(f"\t Error deleting workflow run: {e}")
+                        logger.error(f"Error deleting workflow run: {e}", depth=2)
                         no_errors += 1
             else:
                 # we have processed all workflow runs after until_dt
@@ -353,11 +355,11 @@ def get_jobs(
             for w in repo.get_workflows():
                 if wrk_name in w.name:
                     wrkflow = w
-                    logger.info(f"\t Found workflow ({w})")
+                    logger.info(f"Found workflow ({w})", depth=2)
                     break
 
             if wrkflow is None:
-                logger.info(f"\t Workflow *{wrk_name}* not in {repo_name}.")
+                logger.warning(f"Workflow *{wrk_name}* not in {repo_name}.", depth=2)
                 no_errors += 1
                 error_csv.append(
                     {
@@ -380,9 +382,9 @@ def get_jobs(
             else:
                 wrkflow_run = wrkflow_runs[0] if wrkflow_runs.totalCount > 0 else None
 
-            # 3. We have the specific RUN, now get its FIRST job (we know here there is exactly one!)
+            # 3. We have the specific RUN, now get its FIRST (and only!) job
             if wrkflow_run is None:
-                logger.info(f"\t No workflow runs found for workflow {wrkflow.name}.")
+                logger.warning(f"No workflow runs found for workflow {wrkflow.name}.", depth=3)
                 no_errors += 1
                 error_csv.append(
                     {
@@ -394,9 +396,9 @@ def get_jobs(
                 )
                 continue
 
-            first_job = wrkflow_run.jobs()[0] if wrkflow_run.jobs().totalCount > 0 else None
-            if first_job is None:
-                logger.warning(f"\t No workflow jobs found for workflow run {wrkflow_run.name}.")
+            job: WorkflowJob = wrkflow_run.jobs()[0] if wrkflow_run.jobs().totalCount > 0 else None
+            if job is None:
+                logger.warning(f"No workflow jobs found for workflow run {wrkflow_run.name}.", depth=3)
                 no_errors += 1
                 error_csv.append(
                     {
@@ -407,23 +409,72 @@ def get_jobs(
                     }
                 )
                 continue
+
+            logger.info(
+                f"Found workflow run: {job.id} - {wrkflow_run.run_started_at.astimezone(TIMEZONE).isoformat()} - {job.html_url}",
+                depth=3,
+            )
+
+            # 4. Finally, see if there are annotations with the automarking result points; if so extract points
+            #
+            # The job object contains the check_run_url. We extract the check_run_id from it.
+            # Format usually: https://api.github.com/repos/{owner}/{repo}/check-runs/{check_run_id}
+            annotations = ""
+            total_points = -1
+            max_points = -1
+            if not job.check_run_url:
+                logger.warning(f"No check run associated with job: {job.id}.", depth=3)
+            else:
+                check_run_id = int(job.check_run_url.split("/")[-1])
+
+                # Get the check run object and retrieve its annotations
+                check_run = repo.get_check_run(check_run_id)
+                for ann in check_run.get_annotations():
+                    # the message may contain braces { and } that may interfere with the logger .format()
+                    #   either replace { and } with {{ and }} or
+                    #   use logger.bind(depth=4) or
+                    #   use logger.info with named arguments (PREFERRED!)
+                    # ann.message = ann.message.replace("{", "{{").replace("}", "}}")
+                    # logger.bind(depth=4).info(f"Annotation: {ann.annotation_level} - {ann.message}")
+                    logger.debug(
+                        "Annotation: {level} - {msg}",
+                        level=ann.annotation_level,
+                        msg=ann.message,
+                        depth=4,
+                    )
+
+                    # automark annotation {""totalPoints"":10,""maxPoints"":100}
+                    if "totalPoints" in ann.message:
+                        total_match = re.search(r'"totalPoints":(\d+)', ann.message)
+                        max_match = re.search(r'"maxPoints":(\d+)', ann.message)
+                        if total_match:
+                            total_points = int(total_match.group(1))
+                        if max_match:
+                            max_points = int(max_match.group(1))
+
+                        logger.info(f"Points obtained from annotation: {total_points}/{max_points}", depth=4)
+
+                annotations = ", ".join([f"{ann.annotation_level}: {ann.message}" for ann in check_run.get_annotations()])
+
+            # generate dict row for CSV output
             wrkflow_job = {
                 "REPO_ID_SUFFIX": repo_id,
                 "REPO_ID": repo_name,
                 "REPO_URL": repo_url,
                 "RUN_ID": wrkflow_run.id,
-                "NAME": first_job.name,
-                "JOB_ID": first_job.id,
-                "HTML_URL": first_job.html_url,
+                "NAME": job.name,
+                "JOB_ID": job.id,
+                "HTML_URL": job.html_url,
                 "RUN_DATE": wrkflow_run.run_started_at.astimezone(TIMEZONE).isoformat(),
+                "ANNOTATIONS": annotations,
+                "TOTAL_POINTS": total_points,
+                "MAX_POINTS": max_points,
             }
+            logger.info("Workflow run results saved!", depth=2)
 
-            logger.info(
-                f"\t Found workflow run log: {wrkflow_job['NAME']} - {wrkflow_job['RUN_DATE']} - {wrkflow_job['HTML_URL']}"
-            )
             output_csv.append(wrkflow_job)
         except GithubException as e:
-            logger.error(f"\t Error in repo {repo_name}: {e}")
+            logger.error(f"Error in repo {repo_name}: {e}", depth=2)
             error_csv.append(
                 {
                     "REPO_ID_SUFFIX": repo_id,
@@ -455,10 +506,10 @@ def get_jobs(
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Handle automarking workflows")
-    
+
     parser.add_argument(
         "ACTION",
-        choices=["start", "delete", "jobs", "status"],
+        choices=["start", "delete", "jobs"],
         help="Action to do on workflows.",
     )
     parser.add_argument("REPO_CSV", help="List of repositories to get data from.")
