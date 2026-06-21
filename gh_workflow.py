@@ -23,34 +23,42 @@ __copyright__ = "Copyright 2024-2025"
 import csv
 from argparse import ArgumentParser
 import time
+
+from github.PaginatedList import PaginatedList
 import util, utils_gh
 from datetime import datetime
 
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
-from github import Github, Repository, Organization, GithubException, Workflow
+from github import Github, Repository, Organization, GithubException, Workflow, WorkflowRun
 from util import (
     TIMEZONE,
     UTC,
     NOW_ISO,
     NOW_TXT,
-    LOGGING_DATE,
-    LOGGING_FMT,
     GH_HTTP_URL_PREFIX,
 )
 
 SCRIPT_NAME = "gh_workflow"
 
-import logging
-from slogger import setup_logging
+# slogger: https://github.com/ssardina/slogger
+from slogger.loguru_backend import logger, setup_logging
 
-logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
-logger.setLevel(logging.INFO)  # set the level of the application logger
-logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
+LEVEL = "INFO"
+# LEVEL = "DEBUG"
+setup_logging(name=SCRIPT_NAME, level=LEVEL, colorize=True, short_levels=True, indent=2, flush=False)
+logger.remove(0)  # Remove default logger to prevent duplicate logs.
+
+
+# import logging
+# from slogger_old import setup_logging
+
+# logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
+# logger.setLevel(logging.INFO)  # set the level of the application logger
+# logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
 START_CSV = f"workflows-start-{NOW_TXT}.csv"
 JOBS_CSV = f"workflows-jobs-{NOW_TXT}.csv"
-JOBS_HEADER_CSV = ["REPO_ID_SUFFIX", "REPO_ID", "REPO_URL", "RESULT", "HTML_URL"]
 
 SLEEP_RATE = 10  # number of repos to process before sleeping
 SLEEP_TIME = 5  # sleep time in seconds between API calls
@@ -280,6 +288,7 @@ def get_jobs(
     """
     no_repos = len(repos)
     output_csv = []
+    error_csv = []
     no_errors = 0
     for k, r in enumerate(repos, start=1):
         if k % SLEEP_RATE == 0 and k > 0:
@@ -298,8 +307,12 @@ def get_jobs(
         try:
             repo = g.get_repo(repo_name)
 
-            # first we get the workflow we are after
-            wrkflow : Workflow = None
+            # Workflow — the YAML file (e.g. .github/workflows/ci.yml) defining what to do.
+            # Run — one execution of a workflow, Has a run_id. A workflow can have many runs over time.
+            # Job — a run is made of one or more jobs, each defined by a jobs: key in the YAML (e.g. build, test, lint). Each job has its own job_id, runs on its own runner/VM, and has its own log/check-run/annotations.
+
+            # 1. Get the workflow by its name
+            wrkflow: Workflow = None
             for w in repo.get_workflows():
                 if wrk_name in w.name:
                     wrkflow = w
@@ -309,58 +322,75 @@ def get_jobs(
             if wrkflow is None:
                 logger.info(f"\t Workflow *{wrk_name}* not in {repo_name}.")
                 no_errors += 1
-                output_csv.append(
-                    [repo_id, repo_name, repo_url, "missing_workflow", ""]
-                )
+                error_csv.append([repo_id, repo_name, repo_url, "missing_workflow"])
                 continue
 
-            # second, we get the worfklow RUN that we want
-            wrkflow_runs = wrkflow.get_runs()
-            wrkflow_run = None
+            # 2. Get the workflow RUN that we want from its the name of the run (if given) or just the first one
+            wrkflow_runs: PaginatedList[WorkflowRun] = wrkflow.get_runs()
+            wrkflow_run: WorkflowRun = None
             if run_name is not None:
                 wrkflow_run = next(
                     (x for x in wrkflow_runs if run_name in x.name),
                     None,
-                )
+                )   # type: ignore
             else:
                 wrkflow_run = wrkflow_runs[0] if wrkflow_runs.totalCount > 0 else None
+
+            # 3. We have the specific RUN, now get its FIRST job (we know here there is exactly one!)
             if wrkflow_run is None:
                 logger.info(f"\t No workflow runs found for workflow {wrkflow.name}.")
                 no_errors += 1
-                output_csv.append(
-                    [repo_id, repo_name, repo_url, "no_workflow_runs", ""]
-                )
+                error_csv.append([repo_id, repo_name, repo_url, "no_workflow_runs"])
                 continue
 
-            # third we get its FIRST job (we know here there is one at least!)
-            wrkflow_job_name = wrkflow_run.jobs()[0].name
-            wrkflow_job_html = wrkflow_run.jobs()[0].html_url
-            wrkflow_job_date = wrkflow_run.run_started_at.astimezone(TIMEZONE)
+            first_job = wrkflow_run.jobs()[0] if wrkflow_run.jobs().totalCount > 0 else None
+            if first_job is None:
+                logger.warning(f"\t No workflow jobs found for workflow run {wrkflow_run.name}.")
+                no_errors += 1
+                error_csv.append([repo_id, repo_name, repo_url, "no_workflow_jobs"])
+                continue
+            wrkflow_job = {
+                "REPO_ID_SUFFIX": repo_id,
+                "REPO_ID": repo_name,
+                "REPO_URL": repo_url,
+                "RUN_ID": wrkflow_run.id,
+                "NAME": first_job.name,
+                "JOB_ID": first_job.id,
+                "HTML_URL": first_job.html_url,
+                "RUN_DATE": wrkflow_run.run_started_at.astimezone(TIMEZONE).isoformat(),
+            }
 
             logger.info(
-                f"\t Found workflow run log: {wrkflow_job_name} - {wrkflow_job_date} - {wrkflow_job_html}"
+                f"\t Found workflow run log: {wrkflow_job['NAME']} - {wrkflow_job['RUN_DATE']} - {wrkflow_job['HTML_URL']}"
             )
-            output_csv.append(
-                [repo_id, repo_name, repo_url, wrkflow_job_name, wrkflow_job_html]
-            )
+            output_csv.append(wrkflow_job)
         except GithubException as e:
             logger.error(f"\t Error in repo {repo_name}: {e}")
-            output_csv.append([repo_id, repo_name, repo_url, "exception", ""])
+            error_csv.append([repo_id, repo_name, repo_url, "exception"])
             no_errors += 1
 
     logger.info(f"Finished! No of repos processed: {no_repos} - Errors: {no_errors}")
 
-    output_csv.sort()
-    with open(JOBS_CSV, "w", newline="") as file:
-        writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
-        writer.writerow(JOBS_HEADER_CSV)
-        writer.writerows([row for row in output_csv])
+    # output_csv.sort(key=lambda row: next(iter(row.values())))
+    if output_csv:
+        with open(JOBS_CSV, "w", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=output_csv[0].keys(), quoting=csv.QUOTE_NONNUMERIC)
+                writer.writeheader()
+                writer.writerows(output_csv)
+        logger.info(f"Results data written to CSV file: {JOBS_CSV}")
 
-    logger.info(f"Results data written to CSV file: {JOBS_CSV}")
+    if error_csv:
+        error_csv.sort()
+        with open(f"errors-{JOBS_CSV}", "w", newline="") as file:
+            writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
+            writer.writerow(["REPO_ID_SUFFIX", "REPO_ID", "REPO_URL", "ERROR"])
+            writer.writerows([row for row in error_csv])
+        logger.warning(f"Errors data written to CSV file: errors-{JOBS_CSV}")
 
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Handle automarking workflows")
+    
     parser.add_argument(
         "ACTION",
         choices=["start", "delete", "jobs", "status"],
@@ -376,8 +406,12 @@ if __name__ == "__main__":
         required=True,
         help="File containing GitHub authorization token/password.",
     )
-    parser.add_argument("--name", help="title of workflow to start.")
-    parser.add_argument("--run-name", help="name of the run (if not default one).")
+    parser.add_argument(
+        "--name",   
+        help="name of the YAML workflow (e.g., 'Autograding').")
+    parser.add_argument(
+        "--run-name",
+        help="name of the run (e.g., 'Augrading end week June 20th 2026'; if not default to first run).")
     parser.add_argument(
         "--commit",
         default="main",
