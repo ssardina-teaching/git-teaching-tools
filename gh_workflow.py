@@ -22,6 +22,7 @@ __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2024-2025"
 import csv
 from argparse import ArgumentParser
+from pathlib import Path
 import time
 
 from github.PaginatedList import PaginatedList
@@ -57,8 +58,8 @@ logger.remove(0)  # Remove default logger to prevent duplicate logs.
 # logger.setLevel(logging.INFO)  # set the level of the application logger
 # logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
-START_CSV = f"workflows-start-{NOW_TXT}.csv"
-JOBS_CSV = f"workflows-jobs-{NOW_TXT}.csv"
+START_CSV = Path(f"workflows-start-{NOW_TXT}.csv")
+JOBS_CSV = Path(f"workflows-jobs-{NOW_TXT}.csv")
 
 SLEEP_RATE = 10  # number of repos to process before sleeping
 SLEEP_TIME = 5  # sleep time in seconds between API calls
@@ -81,7 +82,6 @@ def delete_workflow(
         run_name (str, optional): name of the run.
     """
     no_repos = len(repos)
-    output_csv = []
     no_errors = 0
     no_deleted = 0
     for k, r in enumerate(repos, start=1):
@@ -153,6 +153,7 @@ def start_workflow(
     """
     no_repos = len(repos)
     output_csv = []
+    error_csv = []
     no_errors = 0
     for k, r in enumerate(repos, start=1):
         if k % SLEEP_RATE == 0 and k > 0:
@@ -196,8 +197,13 @@ def start_workflow(
                     logger.info(
                         f"\t Already marked with state: {commit_statuses[0].state}"
                     )
-                    output_csv.append(
-                        [repo_id, repo_name, repo_url, "already_marked", "", ""]
+                    error_csv.append(
+                        {
+                            "REPO_ID_SUFFIX": repo_id,
+                            "REPO_ID": repo_name,
+                            "REPO_URL": repo_url,
+                            "ERROR": "already_marked",
+                        }
                     )
                     continue
 
@@ -217,7 +223,14 @@ def start_workflow(
                     f"\t Workflow *{wrk_name}* not in {repo_name} - {repo_url}."
                 )
                 no_errors += 1
-                output_csv.append([repo_id, repo_name, repo_url, "missing_workflow", "", ""])
+                error_csv.append(
+                    {
+                        "REPO_ID_SUFFIX": repo_id,
+                        "REPO_ID": repo_name,
+                        "REPO_URL": repo_url,
+                        "ERROR": "missing_workflow",
+                    }
+                )
                 continue
 
             # -----> We found the workflow! NOW RUN IT ON COMMIT SHA!!!
@@ -239,30 +252,54 @@ def start_workflow(
                     logger.error(
                         f"\t Workflow *{workflow_selected.name}* failed to start."
                     )
+                    error_csv.append(
+                        {
+                            "REPO_ID_SUFFIX": repo_id,
+                            "REPO_ID": repo_name,
+                            "REPO_URL": repo_url,
+                            "ERROR": "workflow_start_failed",
+                        }
+                    )
                     no_errors += 1
             else:
                 no_errors += 1
-            output_csv.append(
-                [repo_id, repo_name, repo_url, result, commit_sha_sort, commit_date]
-            )
+            output_csv.append({
+                "REPO_ID_SUFFIX": repo_id,
+                "REPO_ID": repo_name,
+                "REPO_URL": repo_url,
+                "RESULT": result,
+                "COMMIT_SHA": commit_sha_sort,
+                "COMMIT_DATE": commit_date,
+            })
         except GithubException as e:
             logger.error(f"\t Error in repo {repo_name}: {e}")
-            output_csv.append([repo_id, repo_name, repo_url, "exception", "", ""])
+            error_csv.append({
+                "REPO_ID_SUFFIX": repo_id,
+                "REPO_ID": repo_name,
+                "REPO_URL": repo_url,
+                "ERROR": "exception",
+            })
             no_errors += 1
 
     logger.info(f"Finished! No of repos processed: {no_repos} - Errors: {no_errors}")
 
     if not dry_run:
-        output_csv.sort()
-        with open(START_CSV, "w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["REPO_ID_SUFFIX", "REPO_ID", "REPO_URL", "RESULT", "COMMIT_SHA", "COMMIT_DATE"])
-            writer.writerows([row for row in output_csv])
+        # output_csv.sort()
+        if output_csv:
+            with open(START_CSV, "w", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=output_csv[0].keys(), quoting=csv.QUOTE_NONNUMERIC)
+                writer.writeheader()
+                writer.writerows(output_csv)
+            logger.info(f"Workflow results data written to {START_CSV}.")
 
-    # for repo_id in output_csv:
-    #     print(repo_id)
+        if error_csv:
+            error_file = START_CSV.with_stem(START_CSV.stem + "-errors")
+            with open(error_file, "w", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=error_csv[0].keys(), quoting=csv.QUOTE_NONNUMERIC)
+                writer.writeheader()
+                writer.writerows(error_csv)
 
-    logger.info(f"Workflow results data written to {START_CSV}.")
+        logger.info(f"Workflow error data written to {error_file}.")
 
 
 def get_jobs(
@@ -408,11 +445,12 @@ def get_jobs(
         logger.info(f"Results data written to CSV file: {JOBS_CSV}")
 
     if error_csv:
-        with open(f"errors-{JOBS_CSV}", "w", newline="") as file:
+        error_file = JOBS_CSV.with_stem(JOBS_CSV.stem + "-errors")
+        with open(error_file, "w", newline="") as file:
             writer = csv.DictWriter(file, fieldnames=error_csv[0].keys(), quoting=csv.QUOTE_NONNUMERIC)
             writer.writeheader()
             writer.writerows(error_csv)
-        logger.warning(f"Errors data written to CSV file: errors-{JOBS_CSV}")
+        logger.warning(f"Errors data written to CSV file: {error_file}")
 
 
 if __name__ == "__main__":
