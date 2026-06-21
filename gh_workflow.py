@@ -322,7 +322,14 @@ def get_jobs(
             if wrkflow is None:
                 logger.info(f"\t Workflow *{wrk_name}* not in {repo_name}.")
                 no_errors += 1
-                error_csv.append([repo_id, repo_name, repo_url, "missing_workflow"])
+                error_csv.append(
+                    {
+                        "REPO_ID_SUFFIX": repo_id,
+                        "REPO_ID": repo_name,
+                        "REPO_URL": repo_url,
+                        "ERROR": "missing_workflow",
+                    }
+                )
                 continue
 
             # 2. Get the workflow RUN that we want from its the name of the run (if given) or just the first one
@@ -340,14 +347,28 @@ def get_jobs(
             if wrkflow_run is None:
                 logger.info(f"\t No workflow runs found for workflow {wrkflow.name}.")
                 no_errors += 1
-                error_csv.append([repo_id, repo_name, repo_url, "no_workflow_runs"])
+                error_csv.append(
+                    {
+                        "REPO_ID_SUFFIX": repo_id,
+                        "REPO_ID": repo_name,
+                        "REPO_URL": repo_url,
+                        "ERROR": "no_workflow_runs",
+                    }
+                )
                 continue
 
             first_job = wrkflow_run.jobs()[0] if wrkflow_run.jobs().totalCount > 0 else None
             if first_job is None:
                 logger.warning(f"\t No workflow jobs found for workflow run {wrkflow_run.name}.")
                 no_errors += 1
-                error_csv.append([repo_id, repo_name, repo_url, "no_workflow_jobs"])
+                error_csv.append(
+                    {
+                        "REPO_ID_SUFFIX": repo_id,
+                        "REPO_ID": repo_name,
+                        "REPO_URL": repo_url,
+                        "ERROR": "no_workflow_jobs",
+                    }
+                )
                 continue
             wrkflow_job = {
                 "REPO_ID_SUFFIX": repo_id,
@@ -366,7 +387,14 @@ def get_jobs(
             output_csv.append(wrkflow_job)
         except GithubException as e:
             logger.error(f"\t Error in repo {repo_name}: {e}")
-            error_csv.append([repo_id, repo_name, repo_url, "exception"])
+            error_csv.append(
+                {
+                    "REPO_ID_SUFFIX": repo_id,
+                    "REPO_ID": repo_name,
+                    "REPO_URL": repo_url,
+                    "ERROR": "exception",
+                }
+            )
             no_errors += 1
 
     logger.info(f"Finished! No of repos processed: {no_repos} - Errors: {no_errors}")
@@ -374,17 +402,16 @@ def get_jobs(
     # output_csv.sort(key=lambda row: next(iter(row.values())))
     if output_csv:
         with open(JOBS_CSV, "w", newline="") as file:
-                writer = csv.DictWriter(file, fieldnames=output_csv[0].keys(), quoting=csv.QUOTE_NONNUMERIC)
-                writer.writeheader()
-                writer.writerows(output_csv)
+            writer = csv.DictWriter(file, fieldnames=output_csv[0].keys(), quoting=csv.QUOTE_NONNUMERIC)
+            writer.writeheader()
+            writer.writerows(output_csv)
         logger.info(f"Results data written to CSV file: {JOBS_CSV}")
 
     if error_csv:
-        error_csv.sort()
         with open(f"errors-{JOBS_CSV}", "w", newline="") as file:
-            writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
-            writer.writerow(["REPO_ID_SUFFIX", "REPO_ID", "REPO_URL", "ERROR"])
-            writer.writerows([row for row in error_csv])
+            writer = csv.DictWriter(file, fieldnames=error_csv[0].keys(), quoting=csv.QUOTE_NONNUMERIC)
+            writer.writeheader()
+            writer.writerows(error_csv)
         logger.warning(f"Errors data written to CSV file: errors-{JOBS_CSV}")
 
 
