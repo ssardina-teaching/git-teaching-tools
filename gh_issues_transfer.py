@@ -30,17 +30,26 @@ import argparse
 import time
 import requests
 from github.GithubException import GithubException
-
-import logging
-from slogger import setup_logging
 import util
 import utils_gh
 
 
-logger = setup_logging("transfer_repo", rotating_file="teaching.log", indent=2)
-logger.setLevel(logging.INFO)  # set the level of the application logger
-# logger.setLevel(logging.DEBUG)  # set the level of the application logger
-logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
+SCRIPT_NAME = "gh_issue_trsf"
+
+# slogger: https://github.com/ssardina/slogger
+from slogger.loguru_backend import logger, setup_logging
+
+LEVEL = "INFO"
+# LEVEL = "DEBUG"
+setup_logging(
+    name=SCRIPT_NAME,
+    level=LEVEL,
+    colorize=True,
+    short_levels=True,
+    indent=2,
+    flush=False,
+)
+logger.remove(0)  # Remove default logger to prevent duplicate logs.
 
 
 # ==========================

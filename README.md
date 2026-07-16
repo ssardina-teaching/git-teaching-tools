@@ -56,8 +56,8 @@ Another tool that one can consider is [gh API CLI](https://github.com/cli/cli) t
 | `ghc_build_reporter.py`        | Build YAML autograding-reporter section from test definitions      |
 | `gh_user_access.py`            | List repos in an org and their contributors with access levels     |
 | `gh_issue_labels.py`           | Get or update issue labels in a GH repo                            |
+| `gh_issue_transfer.py`        | Transfer issues between repos in different organizations           |
 | `gh_refresh_invite.sh`         | Refresh pending repo invitations by deleting and re-inviting       |
-| `gh_transfer_issues.py`        | Transfer issues between repos in different organizations           |
 | `gh_unsubscribe.py`            | Unsubscribe from issue/PR notifications                            |
 
 
@@ -101,6 +101,23 @@ $ python ./gh_classroom_collect.py -t ~/.ssh/keys/gh-token-ssardina.txt RMIT-COS
 | `git_batch_commit.py`      | Batch commit to multiple repos                  |
 | `copy_bulk_submissions.py` | Copy folders to submissions                     |
 | `push_marking.sh`          | Push marking folder to submission repos         |
+
+
+## Devel
+
+### Logging
+
+```python
+SCRIPT_NAME = "gh_workflow"
+
+# slogger: https://github.com/ssardina/slogger
+from slogger.loguru_backend import logger, setup_logging
+
+LEVEL = "INFO"
+# LEVEL = "DEBUG"
+setup_logging(name=SCRIPT_NAME, level=LEVEL, colorize=True, short_levels=True, indent=2, flush=False)
+logger.remove(0)  # Remove default logger to prevent duplicate logs.
+```
 
 
 ## Contributors
