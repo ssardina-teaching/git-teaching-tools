@@ -147,6 +147,13 @@ def main():
     if source_org_name == dest_org_name:
         same_org = True
 
+    if not args.closed:
+        logger.info("Only open issues will be transferred. Use --closed to transfer closed issues as well.")
+        confirm = input("Are you sure you want to continue? (y/n): ")
+        if confirm.lower() != "y":
+            logger.warning("Aborting transfer.")
+            exit(0)
+
     ###############################################
     # Authenticate to GitHub
     ###############################################
