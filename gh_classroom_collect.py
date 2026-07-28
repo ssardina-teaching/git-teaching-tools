@@ -23,21 +23,24 @@ import util, utils_gh
 from util import (
     REPOS_HEADER_CSV,
     TIMEZONE,
-    UTC,
-    NOW,
-    NOW_TXT,
     NOW_ISO,
-    LOGGING_DATE,
-    LOGGING_FMT,
-    GH_HTTP_URL_PREFIX,
 )
 SCRIPT_NAME = os.path.basename(__file__)
 
-import logging
-from slogger import setup_logging
-logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)
-logger.setLevel(logging.INFO)  # set the level of the application logger
-logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
+# slogger: https://github.com/ssardina/slogger
+from slogger.loguru_backend import logger, setup_logging
+
+LEVEL = "INFO"
+# LEVEL = "DEBUG"
+setup_logging(
+    name=SCRIPT_NAME,
+    level=LEVEL,
+    colorize=True,
+    short_levels=True,
+    indent=2,
+    flush=False,
+)
+logger.remove(0)  # Remove default logger to prevent duplicate logs.
 
 
 CSV_GITHUB_USERNAME = "github_username"
@@ -53,8 +56,8 @@ if __name__ == "__main__":
     parser.add_argument("CSV", help="CSV file where to store the set of repo links.")
     parser.add_argument(
         "--token",
-        default=os.environ.get("GHTOKEN"),
-        help="File containing GitHub authorization token/password. Defaults to GHTOKEN env variable.",
+        default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
+        help="File containing GitHub authorization token/password. Defaults to GHTOKEN or GH_TOKEN env variable.",
     )
     parser.add_argument(
         "-t",
@@ -79,6 +82,8 @@ if __name__ == "__main__":
     ###############################################
     # Authenticate to GitHub
     ###############################################
+    
+    
     if not args.token_file and not args.token:
         logger.error(
             "No token or token file for authentication provided, quitting...."
