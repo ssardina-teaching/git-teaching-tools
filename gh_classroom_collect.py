@@ -8,21 +8,24 @@ Uses PyGithub (https://github.com/PyGithub/PyGithub) as API to GitHub:
 
 Some usage help on PyGithub:
     https://www.thepythoncode.com/article/using-github-api-in-python
+
+Example usage:
+
+    $ python gh_classroom_collect.py RMIT-COSC1127-3117-AI ai26-p0-warmup repos.csv
 """
+
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
-__copyright__ = "Copyright 2019-2025"
+__copyright__ = "Copyright 2019-2026"
 import csv
-from datetime import datetime
 import re
 import sys
 import traceback
 
 from argparse import ArgumentParser
-from zoneinfo import ZoneInfo
 from github import GithubException
 import os
 
-import util, utils_gh
+import  utils_gh
 from util import (
     REPOS_HEADER_CSV,
     TIMEZONE,
@@ -56,9 +59,9 @@ Both provide logger object but indentation is different:
 # logger.remove(0)  # Remove default logger to prevent duplicate logs.
 
 ############# OPTION 2: via loguru directly + configuration
-from slogger_new import ExtendedLogger
+from slogger.loguru_backend import Slogger
 
-logger = ExtendedLogger(
+logger = Slogger(
     source="collect",
     timezone=TIMEZONE.key,
     sink=sys.stderr,
@@ -101,11 +104,6 @@ if __name__ == "__main__":
     logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
     logger.info(args, depth=1)
     
-
-    exit(1)
-    # logger.bind(indent=1).info(args)             # 1 tab
-
-
     REPO_URL_PATTERN = re.compile(
         r"^{}/{}-(.*)$".format(args.ORG_NAME, args.REPO_ID_PREFIX)
     )
@@ -113,8 +111,6 @@ if __name__ == "__main__":
     ###############################################
     # Authenticate to GitHub
     ###############################################
-    
-    
     if not args.token_file and not args.token:
         logger.error(
             "No token or token file for authentication provided, quitting...."

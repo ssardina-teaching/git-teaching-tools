@@ -110,9 +110,9 @@ $ python ./gh_classroom_collect.py -t ~/.ssh/keys/gh-token-ssardina.txt RMIT-COS
 ```python
 SCRIPT_NAME = "gh_workflow"
 
-from slogger_new import ExtendedLogger
+from slogger.loguru_backend import Slogger
 
-logger = ExtendedLogger(
+logger = Slogger(
     source="collect",
     timezone=TIMEZONE.key,
     sink=sys.stderr

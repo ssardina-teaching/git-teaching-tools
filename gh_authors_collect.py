@@ -11,7 +11,12 @@ Library uses REST API: https://docs.github.com/en/rest
 
 Some usage help on PyGithub:
     https://www.thepythoncode.com/article/using-github-api-in-python
+
+Example usage:
+
+    $ python gh_classroom_collect.py RMIT-COSC1127-3117-AI ai26-p0-warmup repos.csv
 """
+
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2019-2025"
 
@@ -24,31 +29,21 @@ from argparse import ArgumentParser
 from typing import List
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
-from github import Github, Repository, Organization, GithubException
+from github import Repository, GithubException
 
 # local utilities
 import util, utils_gh
 from util import (
-    GH_GIT_URL_PREFIX,
     TIMEZONE,
     UTC,
-    NOW,
-    NOW_ISO,
-    NOW_TXT,
-    LOGGING_DATE,
-    LOGGING_FMT,
-    GH_HTTP_URL_PREFIX,
-    DATE_FORMAT,
+    NOW_ISO    
 )
 
 SCRIPT_NAME = os.path.basename(__file__)
+SCRIPT_NAME = "authors"
 
-import logging
-from slogger import setup_logging
-logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)
-logger.setLevel(logging.INFO)  # set the level of the application logger
-logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
-
+from slogger.loguru_backend import Slogger
+logger = Slogger(source="collect", timezone=TIMEZONE.key)
 
 CSV_HEADER = [
     "REPO",
@@ -136,7 +131,9 @@ def get_commits(
         repo_branches = [b.name for b in repo.get_branches()]
 
     for branch in repo_branches:
-        logger.debug("Processing branch: ", branch)
+        logger.debug(
+            f"Processing branch: {branch}"
+        )
         if since is not None:
             branch_commits = list(repo.get_commits(sha=branch, since=since))
         else:
@@ -214,6 +211,11 @@ if __name__ == "__main__":
         help="if given, only the teams specified will be parsed.",
     )
     parser.add_argument(
+        "--token",
+        default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
+        help="File containing GitHub authorization token/password. Defaults to GHTOKEN or GH_TOKEN env variable.",
+    )
+    parser.add_argument(
         "--tag", help="if given, check up to a given tag (otherwise all repo)."
     )
     parser.add_argument(
@@ -230,9 +232,15 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
-    logger.info(args, depth=1)
-    
+    logger.info(args, indent=1)
+
     csv_file = Path(args.CSV_OUT)
+
+    if args.ignore is not None:
+        # add the ignore users to the list of ignored users
+        IGNORE_USERS.extend(args.ignore)
+
+    logger.info(f"Will ignore the following users: {', '.join(IGNORE_USERS)}")
 
     ###############################################
     # Filter repos as desired
@@ -247,22 +255,16 @@ if __name__ == "__main__":
     ###############################################
     # Authenticate to GitHub
     ###############################################
-    if not args.token_file and not (args.user or args.password):
-        logger.error("No authentication provided, quitting....")
+    if not args.token_file and not args.token:
+        logger.error("No token or token file for authentication provided, quitting....")
         exit(1)
     try:
-        g = utils_gh.open_gitHub(token_file=args.token_file)
+        g = utils_gh.open_gitHub(token=args.token, token_file=args.token_file)
     except:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."
         )
         exit(1)
-
-    if args.ignore is not None:
-        # add the ignore users to the list of ignored users
-        IGNORE_USERS.extend(args.ignore)
-
-    logger.info(f"Will ignore the following users: {', '.join(IGNORE_USERS)}")
 
     ###############################################
     # WORK STARTS HERE
@@ -287,7 +289,7 @@ if __name__ == "__main__":
                     row[key] = datetime.fromisoformat(row[key]) if cast == datetime else cast(row[key])
 
         # extract the latest commit date for each repo (so we can gather from there on)
-        #TODO: eextract it from the stat file in column LAST that we now hve.
+        # TODO: eextract it from the stat file in column LAST that we now hve.
         for commits in commits_previous_csv:
             repo_id = commits["REPO"]
             if (
@@ -324,14 +326,14 @@ if __name__ == "__main__":
                 repo, since=since_date, sha=args.tag, length_msg=50
             )
         except Exception as e:
-            logger.info(f"Exception repo {repo_suffix}: {e}", depth=1)
+            logger.info(f"Exception repo {repo_suffix}: {e}", indent=1)
             errors_csv.append({"REPO": repo_id, "ERROR": e})
             continue
 
         no_commits = len(repos_commits[repo_suffix])
         authors = set([c["AUTHOR"] for c in repos_commits[repo_suffix]])
         logger.info(
-            f"Repo {repo_suffix} has {no_commits} commits from {len(authors)} authors: {authors}.", depth=1
+            f"Repo {repo_suffix} has {no_commits} commits from {len(authors)} authors: {authors}.", indent=1
         )
 
     # At this point, repos_commits dictionary has all commits of all repos.

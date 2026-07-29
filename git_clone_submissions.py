@@ -12,8 +12,6 @@ and clones/updates the repo in an output directory. It also produces a file CSV 
 This script uses GitPython module gitpython to have Git API:
     https://gitpython.readthedocs.io/en/stable/tutorial.html
 
-    $ python -m pip install gitpython
-
 GitPython provides object model access to your git repository.
 A lot of tips on using GitPython: http://www.legendu.net/misc/blog/hands-on-GitPython/
 
@@ -35,7 +33,11 @@ Manual debug via gitpython:
     1648214671
     >>> repo.git.pull()
     'Already up to date.'
+
+Example usage:
+    $ python git_clone_submissions.py --file-timestamps timestamps.csv repos.csv main submissions
 """
+
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2018-2025"
 
@@ -51,26 +53,20 @@ import traceback
 import git
 
 # local utilities
-import util, utils_gh
+import util
 from util import (
-    GH_GIT_URL_PREFIX,
     TIMEZONE,
-    UTC,
-    NOW,
     NOW_ISO,
-    NOW_TXT,
-    LOGGING_DATE,
-    LOGGING_FMT,
-    GH_HTTP_URL_PREFIX,
 )
+
 SCRIPT_NAME = "git_clone"
 
-import logging
-from slogger import setup_logging
-logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
-logger.setLevel(logging.INFO)  # set the level of the application logger
-logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
-
+from slogger.loguru_backend import Slogger
+logger = Slogger(
+    source="collect",
+    timezone=TIMEZONE.key,
+    sink=sys.stderr
+)
 #####################################
 # LOCAL GLOBAL VARIABLES FOR SCRIPT
 #####################################
