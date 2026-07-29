@@ -12,10 +12,13 @@ Some usage help on PyGithub:
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2019-2025"
 import csv
+from datetime import datetime
 import re
+import sys
 import traceback
 
 from argparse import ArgumentParser
+from zoneinfo import ZoneInfo
 from github import GithubException
 import os
 
@@ -25,23 +28,47 @@ from util import (
     TIMEZONE,
     NOW_ISO,
 )
-SCRIPT_NAME = os.path.basename(__file__)
+SCRIPT_NAME = "collect"
+LOG_LEVEL = "INFO"
 
-# slogger: https://github.com/ssardina/slogger
-from slogger.loguru_backend import logger, setup_logging
+"""
+Logging configuration
 
-LEVEL = "INFO"
-# LEVEL = "DEBUG"
-setup_logging(
-    name=SCRIPT_NAME,
-    level=LEVEL,
-    colorize=True,
-    short_levels=True,
-    indent=2,
-    flush=False,
+There are two ways:
+
+    1. use my own slogger module (https://github.com/ssardina/slogger) that extends luguru and provides indentation and other features.
+    2. use loguru directly, but then you have to manually add indentation and other features.
+    
+Both provide logger object but indentation is different:
+    1. logger.info("message", depth=2)  
+    2. logger.bind(depth=2).info("message")   or logger.bind(indent=2).info("message")
+"""
+############# OPTION 1: via slogger (NOT USED ANYMORE WITH LOGGER v2.0)
+# from slogger.loguru_backend import logger, setup_logging
+# setup_logging(
+#     name=SCRIPT_NAME,
+#     level=LEVEL,
+#     colorize=True,
+#     short_levels=True,
+#     indent=2,
+#     flush=False,
+# )
+# logger.remove(0)  # Remove default logger to prevent duplicate logs.
+
+############# OPTION 2: via loguru directly + configuration
+from slogger_new import ExtendedLogger
+
+logger = ExtendedLogger(
+    source="collect",
+    timezone=TIMEZONE.key,
+    sink=sys.stderr,
+    # level=LOG_LEVEL,
+    # fmt=(
+    #     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+    #     "<level>{level: <8}</level> | "
+    #     "<cyan>{extra[source]}</cyan> - <level>{message}</level>"
+    # ),
 )
-logger.remove(0)  # Remove default logger to prevent duplicate logs.
-
 
 CSV_GITHUB_USERNAME = "github_username"
 CSV_GITHUB_IDENTIFIER = "identifier"
@@ -73,6 +100,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
     logger.info(args, depth=1)
+    
+
+    exit(1)
+    # logger.bind(indent=1).info(args)             # 1 tab
 
 
     REPO_URL_PATTERN = re.compile(

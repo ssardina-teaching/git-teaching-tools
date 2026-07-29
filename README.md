@@ -110,13 +110,13 @@ $ python ./gh_classroom_collect.py -t ~/.ssh/keys/gh-token-ssardina.txt RMIT-COS
 ```python
 SCRIPT_NAME = "gh_workflow"
 
-# slogger: https://github.com/ssardina/slogger
-from slogger.loguru_backend import logger, setup_logging
+from slogger_new import ExtendedLogger
 
-LEVEL = "INFO"
-# LEVEL = "DEBUG"
-setup_logging(name=SCRIPT_NAME, level=LEVEL, colorize=True, short_levels=True, indent=2, flush=False)
-logger.remove(0)  # Remove default logger to prevent duplicate logs.
+logger = ExtendedLogger(
+    source="collect",
+    timezone=TIMEZONE.key,
+    sink=sys.stderr
+)
 ```
 
 
