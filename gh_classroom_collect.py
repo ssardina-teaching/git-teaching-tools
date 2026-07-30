@@ -60,18 +60,7 @@ Both provide logger object but indentation is different:
 
 ############# OPTION 2: via loguru directly + configuration
 from slogger.loguru_backend import Slogger
-
-logger = Slogger(
-    source="collect",
-    timezone=TIMEZONE.key,
-    sink=sys.stderr,
-    # level=LOG_LEVEL,
-    # fmt=(
-    #     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-    #     "<level>{level: <8}</level> | "
-    #     "<cyan>{extra[source]}</cyan> - <level>{message}</level>"
-    # ),
-)
+logger = Slogger(source="collect", timezone=TIMEZONE.key)
 
 CSV_GITHUB_USERNAME = "github_username"
 CSV_GITHUB_IDENTIFIER = "identifier"
@@ -85,25 +74,15 @@ if __name__ == "__main__":
     parser.add_argument("REPO_ID_PREFIX", help="Prefix string for the assignment.")
     parser.add_argument("CSV", help="CSV file where to store the set of repo links.")
     parser.add_argument(
-        "--token",
-        default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
-        help="File containing GitHub authorization token/password. Defaults to GHTOKEN or GH_TOKEN env variable.",
-    )
-    parser.add_argument(
         "-t",
-        "--token-file",
-        help="File containing GitHub authorization token/password.",
-    )
-    parser.add_argument(
-        "-m",
-        "--student-map",
-        help=f"CSV file mapping repo suffix ({CSV_GITHUB_USERNAME}) to "
-        f"student ids ({CSV_GITHUB_IDENTIFIER}).",
+        "--token",
+        # default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
+        help="File or string containing GitHub authorization token/password.",
     )
     args = parser.parse_args()
     logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
     logger.info(args, depth=1)
-    
+
     REPO_URL_PATTERN = re.compile(
         r"^{}/{}-(.*)$".format(args.ORG_NAME, args.REPO_ID_PREFIX)
     )
@@ -111,33 +90,18 @@ if __name__ == "__main__":
     ###############################################
     # Authenticate to GitHub
     ###############################################
-    if not args.token_file and not args.token:
-        logger.error(
-            "No token or token file for authentication provided, quitting...."
-        )
-        exit(1)
     try:
-        g = utils_gh.open_gitHub(token=args.token, token_file=args.token_file)
-    except:
+        g = utils_gh.open_gitHub(token=args.token)
+    except Exception as e:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."
         )
+        traceback.print_exc()
         exit(1)
 
-    # If --student-map is given, then it is an individual assignment and a mapping should be given
-    # with columns identifier and github_username (the suffix of repos)
-    user_to_id_map = dict()
-    if args.student_map:
-        with open(args.student_map, "r") as file:
-            csv_content = csv.DictReader(file)
-            for row in csv_content:
-                row = dict(row)
-                user_to_id_map[row[CSV_GITHUB_USERNAME]] = row[CSV_GITHUB_IDENTIFIER]
-    else:
-        logger.info(
-            "No GitHub individual mapping provided. Team assignment; using suffix repo as identifier."
-        )
-
+    ###############################################
+    # START WORK
+    ###############################################
     logger.info(
         "Dumping repos in organization *{}* for assignment *{}* into CSV file *{}*.".format(
             args.ORG_NAME, args.REPO_ID_PREFIX, args.CSV
@@ -188,13 +152,6 @@ if __name__ == "__main__":
         # for each repo in repo_select produce a row in the CSV file, add the team name from mapping
         for k, row in enumerate(repos_select, start=1):
             # if there is a mapping from a repo suffix to a REPO_ID_SUFFIX, do it; otherwise use SUFFIX directly
-            if args.student_map:
-                if row["REPO_ID_SUFFIX"] in user_to_id_map.keys():
-                    row["REPO_ID_SUFFIX"] = user_to_id_map[row["REPO_ID_SUFFIX"]]
-                else:
-                    logger.warning(
-                        f"Repo {row['REPO_ID']} with suffix {row['REPO_ID_SUFFIX']} has no mapping. Using suffix directly."
-                    )
             row['NO'] = k
             row["ORG_NAME"] = args.ORG_NAME
             row["REPO_ID_PREFIX"] = args.REPO_ID_PREFIX

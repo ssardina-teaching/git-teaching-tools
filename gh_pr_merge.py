@@ -16,6 +16,10 @@ __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2019-2026"
 
 from argparse import ArgumentParser
+import os
+from pathlib import Path
+import sys
+import traceback
 from typing import List
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
@@ -29,11 +33,14 @@ from util import (
 )
 
 SCRIPT_NAME = "gh_merge_pr"
-import logging
-from slogger import setup_logging
-logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)
-logger.setLevel(logging.INFO)  # set the level of the application logger
-logger.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
+
+
+from slogger.loguru_backend import Slogger
+
+logger = Slogger(
+    source="collect",
+    timezone=TIMEZONE.key
+)
 
 
 if __name__ == "__main__":
@@ -48,9 +55,9 @@ if __name__ == "__main__":
     parser.add_argument("--title", help="title of PR to merge.")
     parser.add_argument(
         "-t",
-        "--token-file",
-        required=True,
-        help="File containing GitHub authorization token/password.",
+        "--token",
+        # default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
+        help="File or string containing GitHub authorization token/password.",
     )
     args = parser.parse_args()
     logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
@@ -61,6 +68,9 @@ if __name__ == "__main__":
 
     if pr_number is None and pr_title is None:
         logger.error("You must provide a PR number or title to merge.")
+        exit(1)
+    if not args.token:
+        logger.error("No authentication provided, quitting....")
         exit(1)
 
     # Get the list of TEAM + GIT REPO links from csv file
@@ -77,15 +87,13 @@ if __name__ == "__main__":
     ###############################################
     # Authenticate to GitHub
     ###############################################
-    if not args.token_file and not (args.user or args.password):
-        logger.error("No authentication provided, quitting....")
-        exit(1)
     try:
-        g = utils_gh.open_gitHub(token_file=args.token_file)
+        g = utils_gh.open_gitHub(token=args.token)
     except Exception as e:
         logger.error(
-            f"Something wrong happened during GitHub authentication. Check credentials. Exception: {e}"
+            "Something wrong happened during GitHub authentication. Check credentials."
         )
+        traceback.print_exc()
         exit(1)
 
     ###############################################

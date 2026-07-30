@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import sys
 import requests
 from typing import Optional
@@ -6,11 +8,6 @@ from github.GithubException import GithubException
 from github.Repository import Repository
 
 TOKEN = None  # set in main
-
-def read_token(token_file):
-    with open(token_file, "r") as f:
-        return f.read().strip()
-
 
 def get_token(token_str: str, token_file: str) -> str:
     if token_str:
@@ -27,19 +24,21 @@ def get_token(token_str: str, token_file: str) -> str:
         sys.exit(1)
 
 
-def open_gitHub(token_file=None, token=None, user=None, password=None) -> Github:
+def open_gitHub(token: str) -> Github:
+    """Generic function to open a GitHub connection using a token string or token file."""
     global TOKEN
-    # Authenticate to GitHub
+
+    if token is None:
+        token = os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN")  # type: ignore
+    elif Path(token).is_file():
+        with open(token, "r") as f:
+            token = f.read().strip()
+
     if token:
         auth = Auth.Token(token)
         g = Github(auth=auth)
-    elif token_file:
-        token = read_token(token_file)
-        g = Github(token)
-    elif user and password:
-        g = Github(user, password)
     else:
-        raise Exception("No authentication provided, quitting....")
+        raise Exception("❌ No authentication provided, quitting....")
 
     # set global TOKEN for GraphQL queries
     TOKEN = token
