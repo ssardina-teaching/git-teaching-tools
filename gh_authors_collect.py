@@ -26,6 +26,7 @@ from pathlib import Path
 import time
 import os
 from argparse import ArgumentParser
+import traceback
 from typing import List
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
@@ -70,6 +71,12 @@ IGNORE_USERS = [
     "AndrewPaulChester",
     "gourdoni",
 ]
+IGNORE_COMMENTS = [
+    "Merge pull request",
+    "Merge branch",
+    "Initial commit",
+    "[Classroom 50]"
+    ]
 
 SLEEP_RATE = 10  # number of repos to process before sleeping
 SLEEP_TIME = 5  # sleep time in seconds between API calls
@@ -132,7 +139,7 @@ def get_commits(
 
     for branch in repo_branches:
         logger.debug(
-            f"Processing branch: {branch}"
+            f"Processing branch: {branch}", indent=1
         )
         if since is not None:
             branch_commits = list(repo.get_commits(sha=branch, since=since))
@@ -165,6 +172,8 @@ def get_commits(
 
         sha = c.sha
         message = c.commit.message.strip().replace("\n", " ")
+        if any(message.startswith(ignore_comment) for ignore_comment in IGNORE_COMMENTS):
+            continue
         message = message[:length_msg] + "..." if len(message) > length_msg else message
         url = c.html_url
         try:
@@ -202,18 +211,14 @@ if __name__ == "__main__":
     parser.add_argument("CSV_OUT", help="File to output the stats of authors.")
     parser.add_argument(
         "-t",
-        "--token-file",
-        help="File containing GitHub authorization token/password.",
+        "--token",
+        # default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
+        help="File or string containing GitHub authorization token/password.",
     )
     parser.add_argument(
         "--repos",
         nargs="+",
         help="if given, only the teams specified will be parsed.",
-    )
-    parser.add_argument(
-        "--token",
-        default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
-        help="File containing GitHub authorization token/password. Defaults to GHTOKEN or GH_TOKEN env variable.",
     )
     parser.add_argument(
         "--tag", help="if given, check up to a given tag (otherwise all repo)."
@@ -255,15 +260,13 @@ if __name__ == "__main__":
     ###############################################
     # Authenticate to GitHub
     ###############################################
-    if not args.token_file and not args.token:
-        logger.error("No token or token file for authentication provided, quitting....")
-        exit(1)
     try:
-        g = utils_gh.open_gitHub(token=args.token, token_file=args.token_file)
-    except:
+        g = utils_gh.open_gitHub(token=args.token)
+    except Exception as e:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."
         )
+        traceback.print_exc()
         exit(1)
 
     ###############################################
