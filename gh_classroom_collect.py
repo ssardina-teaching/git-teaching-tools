@@ -18,14 +18,13 @@ __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2019-2026"
 import csv
 import re
-import sys
 import traceback
 
 from argparse import ArgumentParser
 from github import GithubException
 import os
 
-import  utils_gh
+import utils_gh
 from util import (
     REPOS_HEADER_CSV,
     TIMEZONE,
@@ -60,7 +59,7 @@ Both provide logger object but indentation is different:
 
 ############# OPTION 2: via loguru directly + configuration
 from slogger.loguru_backend import Slogger
-logger = Slogger(source="collect", timezone=TIMEZONE.key)
+logger = Slogger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 CSV_GITHUB_USERNAME = "github_username"
 CSV_GITHUB_IDENTIFIER = "identifier"

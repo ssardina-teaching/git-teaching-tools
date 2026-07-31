@@ -1,5 +1,5 @@
 """
-This script allows to post to repos Feedback PRs to send bulk messages or post results
+Bulk-post marking results/feedback to the "Feedback" GitHub Issue/PR of many student repos.
 
 Uses PyGithub (https://github.com/PyGithub/PyGithub) as API to GitHub:
 
@@ -8,74 +8,98 @@ Uses PyGithub (https://github.com/PyGithub/PyGithub) as API to GitHub:
 PyGithub documentation: https://pygithub.readthedocs.io/en/latest/introduction.html
 Other doc on PyGithub: https://www.thepythoncode.com/article/using-github-api-in-python
 
+For each repo, the script posts up to two comments on the repo's "Feedback" issue
+(found as issue #1, or by searching pull requests titled "Feedback"):
 
-The script is able to post:
+1. the automarker report (read from a file), wrapped with any BEFORE/AFTER text
+   defined by the report builder config
+2. a feedback/result summary message, built by the report builder config from the
+   student's row in the marking CSV
 
-1. post automarker reports (from file) with feedback text in a message
-2. post a feedback summary message after the report message
+Use --no-report or --no-feedback to post only one of the two. Using --no-report
+alone effectively turns this into a generic "post a message to the Feedback PR"
+tool (e.g., to announce which commit was marked, or the submission date).
 
-By using 2 only, one can also use it to just post messages to the Feedback PR.
-(e.g., clarify which commit was processed, or date of submission)
+Usage:
 
-The script requires:
+    python gh_pr_post_result.py REPO_CSV MARKING_CSV CONFIG.py [REPORT_FOLDER] [options]
 
-1. a CSV file with all the repos to process
-2. a CSV file with the marking information (e.g., GHU, GH suffix, marks, feedback, etc.)
-3. a Python file with the report builder configuration
-3. [OPTIONAL] a folder with the automarker reports to be posted
-4. The GH authorization token/password file (-t)
+Positional arguments:
+
+- REPO_CSV: CSV listing the repos to process, as produced by the repo-collection
+  scripts in this toolset. Must have columns NO, REPO_ID_SUFFIX, REPO_ID, REPO_HTTP
+  (see REPOS_HEADER_CSV in util.py).
+- MARKING_CSV: CSV with one row per student/team with marking data (marks, feedback
+  text, BATCH, etc.). Rows are keyed by the column named by --ghu (default "GHU"),
+  matched case-insensitively against REPO_ID_SUFFIX. A "REPORT" column, if present,
+  overrides the automarker report filename for that row; a "BATCH" column is used by
+  --batch filtering.
+- CONFIG: a Python file (the "report builder") that defines how feedback is built.
+  It must define:
+    * FEEDBACK_REPORT_BEFORE / FEEDBACK_REPORT_AFTER: text (or None) wrapped around
+      the automarker report when posted
+    * result_feedback(mapping) -> str | None: builds the feedback/result summary
+      message from the student's marking-CSV row (a dict); return None to skip
+    * check_submission(repo_id, mapping, batch, logger) -> (message, skip, skip_reason):
+      decides whether/what to post before the report+feedback (e.g., to warn about a
+      late or missing submission); `message` (or None) is posted first, and if `skip`
+      is True the repo is skipped entirely
+  and may optionally define:
+    * get_repos() -> list[str] | None: restricts which repos to process (same effect
+      as --repos)
+  See feedback_p0.py / feedback_p2.py in this folder for examples.
+- REPORT_FOLDER: [optional] folder with automarker report files, one per repo, named
+  "<repo_id>.<extension>" (or "<repo_id>_ERROR.<extension>" to flag a non-error-free
+  submission, which takes precedence if present). If omitted, no report is posted
+  (equivalent to --no-report).
+
+Key options:
+
+- -t/--token: GitHub auth token, as a literal string or a path to a file containing it
+- --repos STR...: only process these REPO_ID_SUFFIX values
+- --ignore STR...: skip these REPO_ID_SUFFIX values
+- --ghu STR: marking-CSV column used as the repo key (default "GHU")
+- --start/-s, --end/-e: process only repos numbered in this range (mutually exclusive
+  with --repos/--ignore/--batch)
+- --batch/-b STR: only process repos whose marking-CSV "BATCH" column matches
+- --extension/-ext STR: automarker report file extension (default "txt")
+- --no-report / --no-feedback: skip the report comment / the feedback comment
+- --dry-run: print messages to console instead of posting to GitHub
 
 Example:
 
-$ python ../tools/git-teaching-tools.git/gh_pr_post_result.py repos.csv marking.csv feedback_p2.py reports -t ~/.ssh/keys/gh-token-ssardina.txt --repos ssardina
+    $ python ../tools/git-teaching-tools.git/gh_pr_post_result.py repos.csv marking.csv feedback_p2.py reports -t ~/.ssh/keys/gh-token-ssardina.txt --repos ssardina
 
-The feedback builder (file pr_message.py in the example) must define the following functions:
-
-- report_feedback(mapping): function to generate the feedback message
-- check_submission(repo_id, mapping, logger): function to check if the repo should be processed
-- FEEDBACK_MESSAGE: message to be added at the end of the feedback report
-- get_repos() [OPTIONAL]: function to get the list of repos to process
-
-The `mapping` is a dictionary with the marking information for the repo, representing one row of the CSV file.
-
-For example on feedback builders see feedback_p2.py in this folder
+Output: appends to pr_comment.csv (successful posts) and pr_comment_errors.csv
+(repos that failed or were skipped), each timestamped.
 """
-
-__author__ = "Sebastian Sardina & Andrew Chester - ssardina - ssardina@gmail.com"
-__copyright__ = "Copyright 2024-2025"
+__author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
+__copyright__ = "Copyright 2024-2026"
 import os
+import sys
+import traceback
+import time
 from argparse import ArgumentParser
 from pathlib import Path
-import traceback
 from github import GithubException
 import importlib.util
-import sys
-import time
 
 from github.Issue import Issue
 from github.IssueComment import IssueComment
-
 
 import util, utils_gh
 from util import (
     NOW_ISO,
     TIMEZONE,
-    UTC,
-    NOW,
     NOW_TXT,
-    LOGGING_DATE,
-    LOGGING_FMT,
     add_csv,
 )
 
 SCRIPT_NAME = "pr_post_result"
 
-import logging
-from slogger import setup_logging
+from slogger.loguru_backend import Slogger
 
-logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
-logger.setLevel(logging.INFO)  # set the level of the application logger
-logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
+logger = Slogger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 
 #####################################
@@ -141,10 +165,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-t",
-        "--token-file",
-        required=True,
-        metavar="PATH",
-        help="File containing GitHub authorization token/password.",
+        "--token",
+        # default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
+        help="File or string containing GitHub authorization token/password.",
     )
     parser.add_argument(
         "--repos",
@@ -327,15 +350,13 @@ if __name__ == "__main__":
     ###############################################
     # Authenticate to GitHub
     ###############################################
-    if not args.token_file:
-        logger.error("No token file for authentication provided, quitting....")
-        exit(1)
     try:
-        g = utils_gh.open_gitHub(token_file=args.token_file)
-    except:
+        g = utils_gh.open_gitHub(token=args.token)
+    except Exception as e:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."
         )
+        traceback.print_exc()
         exit(1)
 
     ###############################################
