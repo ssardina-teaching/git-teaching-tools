@@ -53,7 +53,6 @@ Another tool that one can consider is [gh API CLI](https://github.com/cli/cli) t
 | `gh_workflow.py`               | Start, inspect, or delete automarking workflow runs                |
 | `gh_commits_after.py`          | Get commits after a given date                                     |
 | `gh_tags_after.py`             | Get repos with a given tag after a date                            |
-| `ghc_build_reporter.py`        | Build YAML autograding-reporter section from test definitions      |
 | `gh_user_access.py`            | List repos in an org and their contributors with access levels     |
 | `gh_issue_labels.py`           | Get or update issue labels in a GH repo                            |
 | `gh_issue_transfer.py`        | Transfer issues between repos in different organizations           |
@@ -76,6 +75,14 @@ Many GIT-based scripts then run on cloned versions of the repo, all in a `submis
 ```shell
 $ python ./gh_classroom_collect.py -t ~/.ssh/keys/gh-token-ssardina.txt RMIT-COSC1127-1125-AI24  p3-prolog repos.csv |& tee -a repos.log
 ```
+
+### Classroom50 tools
+
+| Script                  | Description                                                   |
+| ----------------------- | ------------------------------------------------------------- |
+| `ghc_roster_remove.py`  | Remove students from class and organizations                  |
+| `ghc_build_reporter.py` | Build YAML autograding-reporter section from test definitions |
+
 
 ### Git Tools
 
