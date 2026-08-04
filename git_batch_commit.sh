@@ -1,13 +1,26 @@
 #!/bin/bash
 
+TEMPLATE=project-examalloc-template.git
+
+
 ##### GET OPTIONS FROM COMMAND-LINE
 NO_ARGS=$#   # Get the number of arguments passed in the command lin
 ME=`basename "$0"`
+DRY_RUN=false
 
 if [ "$NO_ARGS" -lt 1 ]; then
-  echo -e "USAGE: ./$ME <folder with repos>"
+  echo -e "USAGE: ./$ME <folder with repos> [--dry-run]" 
   exit
 fi
+
+# Parse arguments
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run)
+      DRY_RUN=true
+      ;;
+  esac
+done
 
 echo
 echo "# arguments called with ---->  ${@}     "
@@ -27,6 +40,16 @@ IFS=$(echo -en "\n\b")
 #########################
 # HERE GOES THE SCRIPT
 #########################
+
+run() {
+  if $DRY_RUN; then
+    echo "[DRY-RUN] "$*""
+  else
+    "$@"
+  fi
+}
+
+
 COUNTER=0
 for dir in $(ls -d $1/*) ; do
 
@@ -35,36 +58,53 @@ for dir in $(ls -d $1/*) ; do
 
     let COUNTER++
     echo "=================> Processing folder $COUNTER: "$dir""
-    git -C "$dir" pull  # first update repo
+    URL=$(git -C "$dir" remote show origin | grep Fetch.URL | sed 's/.*git@\(.*\):/http:\/\/\1\//')
+    echo "REPO: $URL"
+    run git -C "$dir" pull  # first update repo
 
     ######################################################
     # HERE IS WHERE WE DO THE CHANGES TO THE REPO IN $d/
     ######################################################
     # Get into student repo, add, commit and push
 
-    # Replace automarking github
-    rm -rf $dir/.github
-    cp -a ./workshop-2-template.git/.github/ $dir/
+    # sync files from template
+    SYNC_FILES=( 
+      $TEMPLATE/./README.md 
+      # $TEMPLATE/./EXAM_ALLOCATE.md 
+      # $TEMPLATE/./LICENSE 
+      $TEMPLATE/./benchmarks/README.md 
+      $TEMPLATE/./examalloc/validator/README.md 
+      # $TEMPLATE/./pyproject.toml
+    )
+    run rsync -av --delete --relative "${SYNC_FILES[@]}" $dir/
 
-    MESSAGE="Upgrade automarking workflow with new GH system"
+    # run rm $dir/RURBICS.md
 
-    ## Copy good files into student repo
-    # cp pacman-p1-search.git/pacman.py $dir/
-    # MESSAGE = "Updated pacman.py; fix foodEdible issue"
+    MESSAGE="Update docs and spec."
+    MESSAGE="Update project TOML file."
+    MESSAGE="Clarification on capitalisation of IDs and timeslots coincidences."
+    MESSAGE="Updates on doc; clarify constraints; fix URL link to FAQ."
+    MESSAGE="Explicit note on timeslot coincidence for 2+ groups."
+    MESSAGE="Further clarified level 1 constraints"
+    MESSAGE="Updated submission links and report folder"
+
 
     ######################################################
     # FINISH CHANGES
     ######################################################
 
     echo "Will commit with message: **$MESSAGE**"
-    git -C $dir add .
-    git -C $dir commit -m $MESSAGE
-    git -C $dir push
+    run git -C $dir add .
+    run git -C $dir commit -m $MESSAGE
+    run git -C $dir push
 
     # Wait a bit to not be pushed out....
-    echo
     sleep 3
+    echo next...
 done
 
 # restore $IFS
 IFS=$SAVEIFS
+
+
+
