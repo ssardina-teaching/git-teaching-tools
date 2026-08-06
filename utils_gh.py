@@ -1,13 +1,17 @@
 import os
-from pathlib import Path
 import sys
 import requests
+from pathlib import Path
 from typing import Optional
 from github import Github, Auth
 from github.GithubException import GithubException
 from github.Repository import Repository
 
+from util import TIMEZONE
+from slogger.loguru_backend import logger
+
 TOKEN = None  # set in main
+
 
 def get_token(token_str: str, token_file: str) -> str:
     if token_str:
@@ -46,21 +50,34 @@ def open_gitHub(token: str) -> Github:
     return g
 
 
+def check_rate_limit(g: Github, no_repos_estimate) -> None:
+    """Check the GitHub API rate limit and warn if we are low on quota for this"""
+    core_rate = g.get_rate_limit().rate
+    logger.info(
+        f"GitHub API rate limit: {core_rate.remaining}/{core_rate.limit} remaining, "
+        f"resets at {core_rate.reset.astimezone(TIMEZONE).isoformat()}."
+    )
+    if core_rate.remaining < no_repos_estimate:
+        logger.warning(
+            f"\t Only {core_rate.remaining} API calls left but processing may need ~{no_repos_estimate}."
+            f"This run may stall/fail on rate limits."
+        )
+
+
 def get_issue_node_id(g: Github, repo: Repository, issue_number: int) -> Optional[str]:
     """Get the GraphQL node ID for a given issue or PR, identified by its number."""
     try:
         # GET /repos/{owner}/{repo}/issues/{issue_number}
         response, data = g.requester.requestJsonAndCheck(
-            "GET",
-            f"/repos/{repo.full_name}/issues/{issue_number}"
+            "GET", f"/repos/{repo.full_name}/issues/{issue_number}"
         )
         # Extract the global GraphQL node ID
-        node_id = data['node_id']
+        node_id = data["node_id"]
         return node_id
     except GithubException as e:
         if e.status == 404:
-            return None   # issue does not exist
-        raise            # real error → propagate
+            return None  # issue does not exist
+        raise  # real error → propagate
 
 
 def unsubscribe(g: Github, issue_node_id: str) -> dict:
