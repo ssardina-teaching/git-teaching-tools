@@ -97,8 +97,10 @@ from util import (
 
 SCRIPT_NAME = "pr_post_result"
 
-from slogger.loguru_backend import Slogger
-logger = Slogger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
+
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 
 #####################################

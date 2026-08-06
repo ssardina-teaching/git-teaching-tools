@@ -53,14 +53,10 @@ from util import (
 )
 
 
-import logging
-import coloredlogs
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
 
-LOGGING_LEVEL = logging.INFO
-# LOGGING_LEVEL = logger.DEBUG
-# logger.basicConfig(format=LOGGING_FMT, level=LOGGING_LEVEL, datefmt=LOGGING_DATE)
-logger = logging.getLogger(__name__)
-coloredlogs.install(level=LOGGING_LEVEL, fmt=LOGGING_FMT, datefmt=LOGGING_DATE)
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 
 if __name__ == "__main__":

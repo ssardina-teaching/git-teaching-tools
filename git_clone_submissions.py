@@ -61,12 +61,12 @@ from util import (
 
 SCRIPT_NAME = "git_clone"
 
-from slogger.loguru_backend import Slogger
-logger = Slogger(
-    source="collect",
-    timezone=TIMEZONE.key,
-    sink=sys.stderr
-)
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
+
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
+
+
 #####################################
 # LOCAL GLOBAL VARIABLES FOR SCRIPT
 #####################################

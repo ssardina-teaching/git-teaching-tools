@@ -34,8 +34,10 @@ from util import (
 )
 SCRIPT_NAME = "gh_check"
 
-from slogger.loguru_backend import Slogger
-logger = Slogger(source="collect", timezone=TIMEZONE.key)
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
+
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 # Application global variables
 CSV_HEADER = ["REPO_ID_SUFFIX", "REPO_ID", "PR_URL", "RESULT", "DETAILS"]

@@ -48,9 +48,11 @@ from util import NOW_TXT, TIMEZONE, add_csv
 
 SCRIPT_NAME = "gh_roster_remove"
 
-from slogger.loguru_backend import Slogger
 
-logger = Slogger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
+
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 
 CSV_ERRORS = "roster_remove_errors.csv"

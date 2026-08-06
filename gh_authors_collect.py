@@ -43,8 +43,11 @@ from util import (
 SCRIPT_NAME = os.path.basename(__file__)
 SCRIPT_NAME = "authors"
 
-from slogger.loguru_backend import Slogger
-logger = Slogger(source="collect", timezone=TIMEZONE.key)
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
+
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
+
 
 CSV_HEADER = [
     "REPO",

@@ -45,11 +45,10 @@ from util import (
 )
 SCRIPT_NAME = "git_post_comment"
 
-import logging
-from slogger import setup_logging
-logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
-logger.setLevel(logging.INFO)  # set the level of the application logger
-logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
+
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 #####################################
 # LOCAL GLOBAL VARIABLES FOR SCRIPT
