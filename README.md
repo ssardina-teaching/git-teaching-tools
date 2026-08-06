@@ -114,18 +114,35 @@ $ python ./gh_classroom_collect.py -t ~/.ssh/keys/gh-token-ssardina.txt RMIT-COS
 
 ### Logging
 
+In any main app entry:
+
 ```python
 SCRIPT_NAME = "gh_workflow"
 
-from slogger.loguru_backend import Slogger
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
 
-logger = Slogger(
-    source="collect",
-    timezone=TIMEZONE.key,
-    sink=sys.stderr
-)
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 ```
 
+Then in auxiliarly files, get the same singleton logger instance with:
+
+```python
+from slogger.loguru_backend import logger
+```
+
+### Rate limiting to REST calls
+
+The installed PyGithub (2.8.1) already handles rate of access to the API at the HTTP layer — Github(`auth=auth`) in `utils_gh.py:39` uses the library default `retry=GithubRetry(total=10, ...)`, which automatically retries and backs off on both primary rate limits (waits until `X-RateLimit-Reset`) and secondary/abuse limits, plus a default 0.25s/1s pacing between reads/writes. So we're not starting from zero...
+
+The gaps are at the application level: if all 10 retries get exhausted (e.g. quota won't reset for a while), the exception isn't caught anywhere in the script and it crashes mid-batch, taking down the rest of the repo list with it; and there's no pre-flight warning if you kick off a 300-repo run when your quota is already nearly gone. 
+
+I'd add two small things: 
+
+1. a pre-flight `g.get_rate_limit()` check before the loop that warns (or bails) if remaining quota is too low; and 
+2. a top-level try/except around each repo's processing block that logs+records-to-CSV instead of letting an exhausted-retry exception kill the batch. That's a much smaller change than writing custom backoff logic, since PyGithub already does the hard part.
+
+Want me to implement those two additions?
 
 ## Contributors
 
