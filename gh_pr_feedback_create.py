@@ -13,6 +13,7 @@ __copyright__ = "Copyright 2024-2025"
 
 import csv
 from argparse import ArgumentParser
+import traceback
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Github, GithubException
@@ -76,9 +77,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-t",
-        "--token-file",
-        required=True,
-        help="File containing GitHub authorization token/password.",
+        "--token",
+        # default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
+        help="File or string containing GitHub authorization token/password.",
     )
     parser.add_argument(
         "--dry-run",
@@ -109,15 +110,13 @@ if __name__ == "__main__":
     ###############################################
     # Authenticate to GitHub
     ###############################################
-    if not args.token_file and not (args.user or args.password):
-        logger.error("No authentication provided, quitting....")
-        exit(1)
     try:
-        g = utils_gh.open_gitHub(token_file=args.token_file)
-    except:
+        g = utils_gh.open_gitHub(token=args.token)
+    except Exception as e:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."
         )
+        traceback.print_exc()
         exit(1)
 
     ###############################################
