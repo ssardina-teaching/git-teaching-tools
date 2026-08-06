@@ -98,7 +98,6 @@ from util import (
 SCRIPT_NAME = "pr_post_result"
 
 from slogger.loguru_backend import Slogger
-
 logger = Slogger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 
@@ -106,10 +105,10 @@ logger = Slogger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 # LOCAL GLOBAL VARIABLES FOR SCRIPT
 #####################################
 CSV_ERRORS = "pr_comment_errors.csv"
-CSV_ERRORS_HEADER = ["REPO_ID_SUFFIX", "REPO_URL", "ERROR"]
+CSV_ERRORS_HEADER = ["REPO_ID_SUFFIX", "REPO_URL", "ERROR", "BATCH"]
 
 CSV_POSTED = "pr_comment.csv"
-CSV_POSTED_HEADER = ["REPO_ID_SUFFIX", "REPO_URL", "PR_URL", "STATUS"]
+CSV_POSTED_HEADER = ["REPO_ID_SUFFIX", "REPO_URL", "PR_URL", "STATUS", "BATCH"]
 
 SLEEP_RATE = 10  # number of repos to process before sleeping
 SLEEP_TIME = 5  # sleep time in seconds between API calls
@@ -161,7 +160,10 @@ if __name__ == "__main__":
     parser.add_argument("MARKING_CSV", help="List of student results.")
     parser.add_argument("CONFIG", help="Python report builder configuration file.")
     parser.add_argument(
-        "REPORT_FOLDER", nargs="?", help="Folder containing student report files."
+        "REPORT_FOLDER",
+        nargs="?",
+        type=Path,
+        help="Folder containing student report files.",
     )
     parser.add_argument(
         "-t",
@@ -235,8 +237,6 @@ if __name__ == "__main__":
     # if there is no report folder, then no report posting!
     if args.REPORT_FOLDER is None:
         args.no_report = True
-    else:
-        args.REPORT_FOLDER = Path(args.REPORT_FOLDER)
 
     if not os.path.isfile(args.CONFIG):
         logger.error(
@@ -382,7 +382,7 @@ if __name__ == "__main__":
 
         repo = g.get_repo(repo_name)
         try:
-            # Find the Feedback PR - feedback
+            # 1. Find the Feedback PR - feedback
             #   see we cannot use .get_pull(1) bc it involves reviewing the PRs!
             pr_feedback = repo.get_issue(number=1)
             if pr_feedback.title != "Feedback":
@@ -396,41 +396,40 @@ if __name__ == "__main__":
                         break
                 if pr_feedback is None:
                     logger.error("\t Feedback PR not found! Skipping...")
-                    errors_csv.append([repo_id, repo_url, "Feedback PR not found"])
+                    errors_csv.append([repo_id, repo_url, "missing_pr"])
                     continue
             logger.debug(f"\t Feedback PR found: {pr_feedback}")
 
-            # get the marking data for the student/repo
+            # 2. Get the marking data for the student/repo
             if repo_id not in marking_dict:
                 logger.error(
                     f"\t Repo {repo_id} not found in marking dictionary! Skipping..."
                 )
-                errors_csv.append([repo_id, repo_url, "missing_marking"])
+                errors_csv.append([repo_id, repo_url,"missing_marking"])
                 continue
             marking_repo = marking_dict[repo_id]
 
-            # First, should we skip submission it for any reason?
+            # 3. Check if we should skip the submission for any reason?
             # (e.g., no certification/submission/marking, audit)
-            message, skip, skip_reason = check_submission(
+            skip_post_msg, skip, skip_reason = check_submission(
                 repo_id, marking_repo, args.batch, logger
             )
-            if message is not None:
-                issue_feedback_comment(pr_feedback, message, args.dry_run)
-                logger.info(
-                    f"\t Feedback warning/error posted to {pr_feedback.html_url}."
-                )
-                if not args.dry_run:
-                    posted_csv.append(
-                        [repo_id, repo_url, pr_feedback.html_url, skip_reason]
-                    )
             if skip:
+                if skip_post_msg is not None:
+                    issue_feedback_comment(pr_feedback, skip_post_msg, args.dry_run)
+                    logger.info(
+                        f"\t Feedback warning/error posted to {pr_feedback.html_url}."
+                    )
+                    posted_csv.append(
+                            [repo_id, repo_url, pr_feedback.html_url, skip_reason]
+                    )
                 continue
 
-            # Here there is a proper submission!
-            # Issue the autograder report & feedback summary
+            # HERE THERE IS A PROPER SUBMISSION!
+            # Issue 1) the autograder report & 2) the feedback summary table
 
-            # First, create a new comment in PR with automarker report (if any)
-            if not args.no_report:
+            # 4.1. First, create a new comment in PR with automarker report (if any)
+            if not args.no_report and args.REPORT_FOLDER is not None:
                 file_report = args.REPORT_FOLDER / f"{repo_id}.{args.extension}"
                 file_report_error = (
                     args.REPORT_FOLDER / f"{repo_id}_ERROR.{args.extension}"
@@ -449,7 +448,7 @@ if __name__ == "__main__":
                     logger.error(
                         f"\t Error in repo {repo_name}: report {file_report} (or _ERROR) not found."
                     )
-                    errors_csv.append([repo_id, repo_url, "Report not found"])
+                    errors_csv.append([repo_id, repo_url, "report_missing"])
                     continue
                 if file_report.stat().st_size > 50000:
                     logger.warning(f"\t Too large automarker report to publish")
@@ -462,27 +461,26 @@ if __name__ == "__main__":
                     with open(file_report, "r") as report:
                         report_text = report.read()
 
-                    message = f"# Feedback Report ✅\n\n"
+                    skip_post_msg = f"# Feedback Report ✅\n\n"
                     if FEEDBACK_REPORT_BEFORE is not None:
-                        message += FEEDBACK_REPORT_BEFORE
-                    message += f"\n\n ```{args.extension}\n{report_text}```"
+                        skip_post_msg += FEEDBACK_REPORT_BEFORE
+                    skip_post_msg += f"\n\n ```{args.extension}\n{report_text}```"
                     if error_text is not None:
-                        message += f"\n**NOTE**: {error_text}"
+                        skip_post_msg += f"\n**NOTE**: {error_text}"
                     if FEEDBACK_REPORT_AFTER is not None:
-                        message += f"\n\n{FEEDBACK_REPORT_AFTER}"
-                    issue_feedback_comment(pr_feedback, message, args.dry_run)
+                        skip_post_msg += f"\n\n{FEEDBACK_REPORT_AFTER}"
+                    issue_feedback_comment(pr_feedback, skip_post_msg, args.dry_run)
 
-            # Second, create COMMENT with the feedback summary
+            # 4.2 Finally, create COMMENT SUMMARY TABLE with the feedback summary
             if not args.no_feedback:
                 feedback_text = result_feedback(marking_repo)
                 if feedback_text is not None:
-                    message = f"Dear @{repo_id}: find here the FEEDBACK & RESULTS for the project. \n\n {feedback_text}"
-                    message = feedback_text
-                    issue_feedback_comment(pr_feedback, message, args.dry_run)
+                    skip_post_msg = f"Dear @{repo_id}: find here the FEEDBACK & RESULTS for the project. \n\n {feedback_text}"
+                    skip_post_msg = feedback_text
+                    issue_feedback_comment(pr_feedback, skip_post_msg, args.dry_run)
 
             logger.info(f"\t Feedback comment/report posted to {pr_feedback.html_url}.")
-            if not args.dry_run:
-                posted_csv.append([repo_id, repo_url, pr_feedback.html_url, "OK"])
+            posted_csv.append([repo_id, repo_url, pr_feedback.html_url, "OK"])
 
         except GithubException as e:
             logger.error(f"\t Error in repo {repo_name}: {e}")
@@ -493,21 +491,26 @@ if __name__ == "__main__":
             )
             errors_csv.append([repo_id, repo_url, e])
 
-    logger.info(f"Finished! Total repos: {no_repos} - Errors: {len(errors_csv)}.")
+    logger.info(f"Finished! Total repos: {no_repos} - Successful: {len(posted_csv)} / Errors: {len(errors_csv)}.")
 
-    add_csv(
-        CSV_ERRORS,
-        CSV_ERRORS_HEADER,
-        errors_csv,
-        append=True,
-        timestamp=NOW_TXT,
-    )  # write the errors to a CSV file
-    add_csv(
-        CSV_POSTED,
-        CSV_POSTED_HEADER,
-        posted_csv,
-        append=True,
-        timestamp=NOW_TXT,
-    )  # write the errors to a CSV file
+    # add the batch to the CSV data if it is present, otherwise add an empty string
+    posted_csv = [x + [args.batch if args.batch else ""] for x in posted_csv] 
+    errors_csv = [x + [args.batch if args.batch else ""] for x in errors_csv]
 
-    logger.info(f"Repos with errors written to {CSV_ERRORS}.")
+    if not args.dry_run:
+        add_csv(
+            CSV_ERRORS,
+            CSV_ERRORS_HEADER,
+            errors_csv,
+            append=True,
+            timestamp=NOW_TXT,
+        )  # write the errors to a CSV file
+        add_csv(
+            CSV_POSTED,
+            CSV_POSTED_HEADER,
+            posted_csv,
+            append=True,
+            timestamp=NOW_TXT,
+        )  # write the errors to a CSV file
+
+        logger.info(f"CSV log updated with new posting: {CSV_POSTED} / {CSV_ERRORS}.")
