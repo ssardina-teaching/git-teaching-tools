@@ -1,19 +1,44 @@
 """
-Check which repos are missing PR #1 for Feedback from GitHub Classroom; create PR if needed
+Sync a batch of student/team repos (forks or GitHub Classroom repos) with an upstream
+source repo, by opening a "Sync Assignment" pull request in each one (or, if
+create_pr=False in sync_fork(), fast-forwarding the target branch directly instead).
 
-Uses PyGithub (https://github.com/PyGithub/PyGithub) as API to GitHub:
+For each repo listed in REPO_CSV:
+  1. Compare its target branch (default "main") against the latest commit on the
+     source repo's branch (default "main").
+  2. If it is not behind, skip it.
+  3. Otherwise create/update a "sync-<branch>" branch in the repo pointing at the
+     upstream commit, and open a pull request from that branch into the target branch
+     (or fast-forward the target branch directly when create_pr=False).
+
+Usage:
+    python3 gh_pr_create.py REPO_CSV REPO [--branch main] [--title TITLE]
+                             [--repos ID [ID ...]] [-t TOKEN] [--csv]
+
+    REPO_CSV    CSV file listing the repos to process. Must have (at least) the
+                columns REPO_ID_SUFFIX, REPO_ID (owner/name) and REPO_HTTP, as
+                produced by util.get_repos_from_csv().
+    REPO        Upstream/source repo, in "owner/name" form, that all listed repos
+                should be synced with.
+
+Requires PyGithub (https://github.com/PyGithub/PyGithub) as the GitHub API client:
 
     python3 -m pip install PyGithub
 
 PyGithub documentation: https://pygithub.readthedocs.io/en/latest/introduction.html
 Other doc on PyGithub: https://www.thepythoncode.com/article/using-github-api-in-python
+
+sync_fork() returns a (status, detail) tuple per repo, appended to a results list and,
+if --csv is passed, written/appended to CSV_OUTPUT ("pr_create.csv"). Possible status
+values: up_to_date, pr_created, pr_exists (an open sync PR was already there, skipped
+to avoid duplicates), fast_forwarded, error_branch, error_pr, error_ff.
 """
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2024-2025"
 
 import csv
 from argparse import ArgumentParser
-from pdb import main
+import traceback
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Github, GithubException
@@ -27,12 +52,9 @@ from util import (
 )
 SCRIPT_NAME = "gh_pr_feedback_create"
 
+from slogger.loguru_backend import Slogger
+logger = Slogger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
-import logging
-from slogger import setup_logging
-logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", indent=2)
-logger.setLevel(logging.INFO)  # set the level of the application logger
-logging.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
 
 #####################################
 # LOCAL GLOBAL VARIABLES FOR SCRIPT
@@ -53,11 +75,9 @@ If you have any questions or concerns, please contact your instructor via the fo
 Attention: @{GH_USERNAME}
 """
 
-from github import GithubException
-
 
 def sync_fork(
-    repo,  # fork repo (PyGitHub object)
+    repo,   # fork repo (PyGitHub object)
     repo_source,  # upstream repo (PyGitHub object)
     source_branch="main",  # branch in upstream
     target_branch="main",  # branch in fork
@@ -69,6 +89,9 @@ def sync_fork(
     Sync repo (fork) from repo_source (upstream).
 
     Via ChatGPT: https://chatgpt.com/s/t_69cc800eb2d881919841d4dea86a6a06
+
+    :return: (status, detail) tuple. status is one of "up_to_date", "pr_created",
+        "pr_exists", "fast_forwarded", "error_branch", "error_pr", "error_ff".
     """
 
     logger.info(
@@ -86,7 +109,7 @@ def sync_fork(
 
     if compare.behind_by == 0:
         logger.info("✅ Fork is already up-to-date. Nothing to do.", depth=1)
-        return
+        return "up_to_date", ""
 
     logger.info(f"⚠️ Fork is {compare.behind_by} commits behind upstream.", depth=1)
 
@@ -101,12 +124,27 @@ def sync_fork(
         ref = repo.get_git_ref(f"heads/{sync_branch}")
         logger.info(f"Updating existing branch {sync_branch}")
         ref.edit(source_sha, force=True)
-    except GithubException:
+    except GithubException as e:
+        if e.status != 404:
+            logger.error(f"❌ Failed to access branch {sync_branch}: {e}", depth=1)
+            return "error_branch", str(e)
         logger.info(f"Creating new branch {sync_branch}")
-        repo.create_git_ref(ref=f"refs/heads/{sync_branch}", sha=source_sha)
+        try:
+            repo.create_git_ref(ref=f"refs/heads/{sync_branch}", sha=source_sha)
+        except GithubException as e2:
+            logger.error(f"❌ Failed to create branch {sync_branch}: {e2}", depth=1)
+            return "error_branch", str(e2)
 
     # --- Step 4: Either create PR or fast-forward
     if create_pr:
+        # skip if a sync PR is already open, to avoid piling up duplicates on reruns
+        existing_prs = list(
+            repo.get_pulls(state="open", head=f"{repo.owner.login}:{sync_branch}", base=target_branch)
+        )
+        if existing_prs:
+            logger.info(f"ℹ️ Open PR already exists: {existing_prs[0].html_url}", depth=1)
+            return "pr_exists", existing_prs[0].html_url
+
         logger.info("📬 Creating pull request...")
 
         try:
@@ -117,9 +155,11 @@ def sync_fork(
                 base=target_branch,
             )
             logger.info(f"✅ PR created: {pr.html_url}", depth=1)
+            return "pr_created", pr.html_url
 
         except GithubException as e:
             logger.error(f"❌ Failed to create PR: {e}", depth=1)
+            return "error_pr", str(e)
 
     else:
         logger.info("⚡ Fast-forwarding branch directly...", depth=1)
@@ -128,9 +168,11 @@ def sync_fork(
             ref = repo.get_git_ref(f"heads/{target_branch}")
             ref.edit(source_sha, force=True)
             logger.info(f"✅ {target_branch} updated to upstream.", depth=1)
+            return "fast_forwarded", target_branch
 
         except GithubException as e:
             logger.error(f"❌ Failed to update branch: {e}", depth=1)
+            return "error_ff", str(e)
 
 
 if __name__ == "__main__":
@@ -156,9 +198,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-t",
-        "--token-file",
-        required=True,
-        help="File containing GitHub authorization token/password.",
+        "--token",
+        # default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
+        help="File or string containing GitHub authorization token/password.",
     )
     parser.add_argument(
         "--csv",
@@ -180,15 +222,13 @@ if __name__ == "__main__":
     ###############################################
     # Authenticate to GitHub
     ###############################################
-    if not args.token_file and not (args.user or args.password):
-        logger.error("No authentication provided, quitting....")
-        exit(1)
     try:
-        g = utils_gh.open_gitHub(token_file=args.token_file)
-    except:
+        g = utils_gh.open_gitHub(token=args.token)
+    except Exception as e:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."
         )
+        traceback.print_exc()
         exit(1)
 
     ###############################################
@@ -212,80 +252,31 @@ if __name__ == "__main__":
         )
 
         repo = g.get_repo(repo_name)    # repo to create PR into (i.e., the student repo)
-        branch = "main"                 # branch in the repo
 
-
-        sync_fork(
+        status, detail = sync_fork(
             repo,  # fork repo (PyGitHub object)
             repo_source,  # upstream repo (PyGitHub object)
-            source_branch="main",  # branch in upstream
-            target_branch="main",  # branch in fork
+            source_branch=args.branch,  # branch in upstream
+            target_branch=args.branch,  # branch in fork
             create_pr=True,  # if True, create PR instead of direct update
+            pr_title=args.title,
         )
-        exit(1)
-        # compare student main branch against commit of the upstream
-        """ NOTE!!!
-        I tried many things with PytGithub .compare and also directly sending JSON
-        request via:
-        
-                repo._requester.requestJsonAndCheck("GET",
-                #     f"/repos/{repo.full_name}/compare/{branch}...{repo_source.owner.login}:flight-template:{args.branch}",
-                # )
-                # print(util.format_json(compare))
-        
-        it was always showing "identical", until I use the exact SHA of the upstream commit      
-        """
-        compare = repo.compare("main", commit_source)
-
-        if compare.status == "identical" or compare.behind_by == 0:
-            logger.info(f"Fork is already up-to-date with upstream. No PR needed. Status compares: {compare.status}")
-            continue
-
-        logger.info(f"Fork is behind upstream by {compare.ahead_by} commits. PR needed. Status compares: {compare.status}", depth=1)
-
-        # now create the PR to sync the fork with upstream!
-        try:
-            print(repo.full_name)
-            repo.create_pull(
-                title=PR_TITLE,
-                body=PR_MESSAGE.format(GH_USERNAME=repo_id),
-                head=f"{repo_source.owner.login}:{args.branch}",  # source branch in upstream
-                base=branch,  # branch in fork to update
-            )
-        except GithubException as e:
-            logger.error(f"\t Exception when creating PR in repo {repo_name}: {e}")
-            if e.data["message"] == "Validation Failed":
-                # This should not happen anymore as we create a dummy commit in main to be able to PR into feedback
-                logger.error(f"\t Perhaps no commits exist in repo.")
-                output_csv.append(
-                    [repo_id, repo_url, "exception_validation", e]
-                )
-            else:
-                output_csv.append([repo_id, repo_url, "exception_create", e])
-                break
-            continue
-
-        # all good! PR was created SUCCESSFULLY!
-        output_csv.append([repo_id, repo_url, "created", ""])
+        output_csv.append([repo_id, repo_url, status, detail])
 
     # print summary stats
-    no_errors = len([x for x in output_csv if not x[2] in ["created"]])
+    no_errors = len([x for x in output_csv if str(x[2]).startswith("error")])
     logger.info(
-        f"Finished! Total repos: {no_repos} - Missing PR: {len(output_csv)} - Errors: {no_errors}."
+        f"Finished! Total repos: {no_repos} - Processed: {len(output_csv)} - Errors: {no_errors}."
     )
 
-    output_csv = sorted(output_csv, key=lambda x: x[2])
-    add_csv(
-        CSV_OUTPUT,
-        CSV_HEADER,
-        output_csv,
-        append=True,
-        timestamp=NOW_TXT,
-        quoting=csv.QUOTE_NONNUMERIC
-    )
-
-    logger.info(f"Output written to CSF file: {CSV_OUTPUT}.")
-
-    # just for manual debug.. ouch!
-    # for r in output_csv:
-    #     print(r)
+    if args.csv:
+        output_csv = sorted(output_csv, key=lambda x: x[2])
+        add_csv(
+            CSV_OUTPUT,
+            CSV_HEADER,
+            output_csv,
+            append=True,
+            timestamp=NOW_TXT,
+            quoting=csv.QUOTE_NONNUMERIC
+        )
+        logger.info(f"Output written to CSV file: {CSV_OUTPUT}.")
