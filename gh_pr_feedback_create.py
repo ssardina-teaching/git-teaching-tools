@@ -1,7 +1,7 @@
 """
 gh_pr_feedback_create.py
 
-Ensure every student repo has an open GitHub Classroom "Feedback" pull request (PR #1),
+Ensure every student repo has an open GitHub Classroom "Feedback" pull request,
 creating it (and its `feedback` base branch) when missing, so teachers have a single
 persistent place to leave feedback and see autograding results.
 
@@ -18,12 +18,13 @@ WHAT IT DOES, per repo in the input CSV:
        If it does not match BASE_SHA (when given), the repo is flagged as possibly
        force-pushed and skipped (result "error_forced") — this is a safety check so we
        never anchor a feedback branch to unexpected history.
-    2. Looks up PR #1 via the GitHub API:
-         - If it exists but its title isn't exactly "Feedback"        -> "error_title", skipped.
-         - If it exists and has been merged                            -> "error_merged", skipped.
-         - If it exists and is open with the right title                -> nothing to do (no CSV row).
-         - If GitHub returns 404 (no PR #1 at all)                     -> proceed to create it.
-         - Any other API error                                          -> "exception_get_pr", skipped.
+    2. Searches ALL pull requests (any state, oldest first) for one titled exactly
+       "Feedback" — it is NOT assumed to be PR #1, since an earlier issue or PR in the
+       same repo shifts the numbering (e.g. issue #1 exists, so the Feedback PR is #2):
+         - If a matching PR is found and has been merged                -> "error_merged", skipped.
+         - If a matching PR is found and is not merged (open or closed) -> nothing to do (no CSV row).
+         - If no matching PR is found                                    -> proceed to create it.
+         - Any API error while listing PRs                                -> "exception_get_pr", skipped.
     3. To create the missing PR:
          a. Resolves an @mention slug for the PR body: the repo's first GitHub Team slug
             if the repo belongs to a team, else the REPO_ID_SUFFIX (assumed to be the
@@ -61,7 +62,7 @@ OUTPUT
     - CSV_OUTPUT (default "pr_create.csv"), appended with one row per repo that needed
       attention (repos that already had a healthy Feedback PR are NOT logged), columns:
       REPO_ID_SUFFIX, REPO_URL, RESULT, DETAILS, TIMESTAMP. RESULT is one of: "created",
-      "dry-run", "error_forced", "error_title", "error_merged", "exception_get_pr",
+      "dry-run", "error_forced", "error_merged", "exception_get_pr",
       "exception_create_branch", "exception_create_dummy_file", "exception_validation",
       "exception_create", "exception_unexpected" (any error not caught above, e.g. rate
       limits exhausted after PyGithub's built-in retries).
@@ -100,6 +101,7 @@ from slogger.loguru_backend import logger, setup_logger
 setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 
+PR_TITLE = "Feedback"
 CALLS_PER_REPO_ESTIMATE = 5  # rough estimate of API calls per repo for this script
 
 #####################################
@@ -140,6 +142,11 @@ if __name__ == "__main__":
     parser.add_argument("REPO_CSV", help="List of repositories to get data from.")
     parser.add_argument(
         "BASE_SHA", nargs="?", help="Base SHA to create feedback branch from (Defaults to first commit in main)."
+    )
+    parser.add_argument(
+        "--title", 
+        default=PR_TITLE, 
+        help="Title of the PR to create (Default: %(default)s)."
     )
     parser.add_argument(
         "--repos", nargs="+", help="if given, only the teams specified will be parsed."
@@ -232,117 +239,129 @@ if __name__ == "__main__":
                 output_csv.append([repo_id, repo_url, "error_forced", first_commit_main.sha])
                 continue
 
-            # OK first commit in main exists, let's check if the PR exists and create it if not
+            # check if a Feedback PR already exists (search by title, not PR number,
+            # since an earlier issue/PR can shift the Feedback PR's number away from 1)
             try:
-                pr_feedback = repo.get_pull(number=1)  
-
-                if pr_feedback.title != "Feedback":
-                    logger.error(f"\t PR with different title {pr_feedback.title}")
-                    output_csv.append([repo_id, repo_url, "error_title", pr_feedback.title])
-                    continue
-
-                if pr_feedback.merged:
-                    logger.info(f"\t PR Feedback merged!!! {pr_feedback}")
-                    output_csv.append([repo_id, repo_url, "error_merged", ""])
-                    continue
+                pr_feedback = next(
+                    (
+                        pr
+                        for pr in repo.get_pulls(state="all", sort="created", direction="asc")
+                        if pr.title == args.title
+                    ),
+                    None,
+                )
             except GithubException as e:
-                # if we get here, there is no FEEDBACK PR #1!
-                # now we are talking...
-                if e.status == 404:
+                logger.error(f"\t Unknown exception listing PRs: {e}")
+                output_csv.append([repo_id, repo_url, "exception_get_pr", e])
+                continue
+
+            if pr_feedback is not None:
+                # Feedback PR already exists, check if it was merged
+                if pr_feedback.merged:
                     logger.info(
-                        f"\t No Feedback PR #1 found in repo {repo_name}. We will create it..."
+                        f"PR Feedback (#{pr_feedback.number}) merged!!! {pr_feedback}",
+                        indent=2,
                     )
+                    output_csv.append([repo_id, repo_url, "error_merged", ""])
                 else:
-                    logger.error(f"\t Unknown exception getting PR Feedback: {e}")
-                    output_csv.append([repo_id, repo_url, "exception_get_pr", e])
+                    logger.info(f"Feedback PR already exists (#{pr_feedback.number}). Nothing to do.", indent=2)
+                continue
+
+            logger.info(f"No Feedback PR found in repo {repo_name}. We will create it...", indent=2)
+
+            # HERE WE KNOW PR IS MISSING, SO WE WILL CREATE IT!
+
+            # get the slug to @mentioning in PR text
+            slug = repo_id
+            repo_teams = repo.get_teams()
+            if repo_teams.totalCount > 0:
+                # get the first team slug
+                slug = repo_teams[0].slug
+                logger.info(f"Using slug {slug} for @mentioning.", indent=2)
+
+            if args.dry_run:
+                pr_message = MESSAGE_PR.format(GH_USERNAME=slug)
+                logger.warning(
+                    f"Dry run!!!: Would create feedback branch at SHA {base_sha[:7]} and Feedback PR with following message:\n {pr_message}",
+                    indent=2,
+                )
+                output_csv.append([repo_id, repo_url, "dry-run", base_sha[:7]])
+                continue
+
+            # FIRST, create a feedback branch from the base SHA
+            pr_branch = args.title.lower().replace(" ", "_")  # feedback
+            try:
+                repo.create_git_ref(f"refs/heads/{pr_branch}", base_sha)
+                logger.info(
+                    f"Created feedback branch '{pr_branch}' at SHA {base_sha[:7]}.", indent=2
+                )
+            except GithubException as e:
+                if e.data["message"] == "Reference already exists":
+                    logger.info(f"Branch '{pr_branch}' already exists.", indent=2)
+                else:
+                    logger.error(f"Error creating branch '{pr_branch}': {e}", indent=2)
+                    output_csv.append([repo_id, repo_url, "exception_create_branch", e])
                     continue
 
-                # get the slug to @mentioning in PR text
-                slug = repo_id
-                repo_teams = repo.get_teams()
-                if repo_teams.totalCount > 0:
-                    # get the first team slug
-                    slug = repo_teams[0].slug
-                    logger.info(f"\t Using slug {slug} for @mentioning.")
-
-                # we know PR is missing, so we will create it
-                if args.dry_run:
-                    pr_message = MESSAGE_PR.format(GH_USERNAME=slug)
-                    logger.warning(
-                        f"\t Dry run!!!: Would create feedback branch at SHA {base_sha[:7]} and Feedback PR with following message:\n {pr_message}"
-                    )
-                    output_csv.append([repo_id, repo_url, "dry-run", base_sha[:7]])
-                    continue
-
-                # FIRST, create a feedback branch from the base SHA
+            # SECOND, create a PR for feedback branch
+            # there must be at least one commit in the main to be able to PR into a feedback PR - create a dummy commit otherwise
+            if no_commits == 1:
+                logger.warning(f"No commits in main branch yet, need to create a dummy one to create PR.", indent=2)
+                keep_file = ".github/keep"
+                keep_content = " "
+                # Check if the file already exists
                 try:
-                    repo.create_git_ref("refs/heads/feedback", base_sha)
-                    logger.info(
-                        f"\t Created feedback branch at SHA {base_sha[:7]}."
+                    existing_file = repo.get_contents(keep_file)
+                    # File exists – update it
+                    repo.update_file(
+                        path=keep_file,
+                        message="Setting up Feedback PR",
+                        content=keep_content,
+                        sha=existing_file.sha,
                     )
                 except GithubException as e:
-                    if e.data["message"] == "Reference already exists":
-                        logger.info(f"\t Branch 'feedback' already exists.")
+                    if e.status == 404:
+                        # File does not exist – create it
+                        repo.create_file(
+                            path=keep_file,
+                            message="Setting up Feedback PR",
+                            content=keep_content,
+                        )
                     else:
-                        logger.error(f"\t Error creating branch 'feedback': {e}")
-                        output_csv.append([repo_id, repo_url, "exception_create_branch", e])
+                        logger.error(f"Error setting up dummy file '{keep_file}': {e}", indent=2)
+                        output_csv.append([repo_id, repo_url, "exception_create_dummy_file", e])
                         continue
 
-                # SECOND, create a PR for feedback branch
-                # there must be at least one commit in the main to be able to PR into a feedback PR - create a dummy commit otherwise
-                if no_commits == 1:
-                    logger.warning(f"\t No commits in main branch yet, need to create a dummy one to create PR.")
-                    keep_file = ".github/keep"
-                    keep_content = " "
-                    # Check if the file already exists
-                    try:
-                        existing_file = repo.get_contents(keep_file)
-                        # File exists – update it
-                        repo.update_file(
-                            path=keep_file,
-                            message="Setting up GitHub Classroom Feedback",
-                            content=keep_content,
-                            sha=existing_file.sha,
-                        )
-                    except GithubException as e:
-                        if e.status == 404:
-                            # File does not exist – create it
-                            repo.create_file(
-                                path=keep_file,
-                                message="Setting up GitHub Classroom Feedback",
-                                content=keep_content,
-                            )
-                        else:
-                            logger.error(f"\t Error setting up dummy file '{keep_file}': {e}")
-                            output_csv.append([repo_id, repo_url, "exception_create_dummy_file", e])
-                            continue
-
-                    logger.info(f"\t Dummy file {keep_file} was updated/created.")
-                # time to create the PR
-                try:
-                    repo.create_pull(
-                        title="Feedback",
-                        body=MESSAGE_PR.format(GH_USERNAME=slug),
-                        head="main",
-                        base="feedback",    # PR from main to feedback
+                logger.info(f"Dummy file {keep_file} was updated/created.", indent=2)
+            # time to create the PR
+            try:
+                pr = repo.create_pull(
+                    title=args.title,
+                    body=MESSAGE_PR.format(GH_USERNAME=slug),
+                    head="main",
+                    base=pr_branch,    # PR from main to feedback
+                )
+                logger.info(
+                    f"Feedback PR #{pr.number} created in repo {repo_name}: {pr.html_url}",
+                    indent=2,
+                )
+            except GithubException as e:
+                logger.error(f"Exception when creating PR in repo {repo_name}: {e}", indent=2)
+                if e.data["message"] == "Validation Failed":
+                    # This should not happen anymore as we create a dummy commit in main to be able to PR into feedback
+                    logger.error(f"Perhaps no commits exist in repo.", indent=2)
+                    output_csv.append(
+                        [repo_id, repo_url, "exception_validation", e]
                     )
-                except GithubException as e:
-                    logger.error(f"\t Exception when creating PR in repo {repo_name}: {e}")
-                    if e.data["message"] == "Validation Failed":
-                        # This should not happen anymore as we create a dummy commit in main to be able to PR into feedback
-                        logger.error(f"\t Perhaps no commits exist in repo.")
-                        output_csv.append(
-                            [repo_id, repo_url, "exception_validation", e]
-                        )
-                    else:
-                        output_csv.append([repo_id, repo_url, "exception_create", e])
-                    continue
+                else:
+                    output_csv.append([repo_id, repo_url, "exception_create", e])
+                continue
 
-                # all good! PR was created SUCCESSFULLY!
-                output_csv.append([repo_id, repo_url, "created", ""])
+            # all good! PR was created SUCCESSFULLY!
+            output_csv.append([repo_id, repo_url, "created", ""])
 
         except Exception as e:
-            logger.error(f"\t Unexpected error processing repo {repo_name}: {e}")
+            logger.error(f"Unexpected error processing repo {repo_name}: {e}", indent=2)
             output_csv.append([repo_id, repo_url, "exception_unexpected", e])
 
     # print summary stats
