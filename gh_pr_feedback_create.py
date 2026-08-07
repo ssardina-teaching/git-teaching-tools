@@ -205,8 +205,9 @@ if __name__ == "__main__":
     no_repos_estimate = len(list_repos) * CALLS_PER_REPO_ESTIMATE  # rough: ~5 API calls per repo
     if core_rate.remaining < no_repos_estimate:
         logger.warning(
-            f"\t Only {core_rate.remaining} API calls left but processing {len(list_repos)} "
-            f"repos may need ~{no_repos_estimate}. This run may stall/fail on rate limits."
+            f"Only {core_rate.remaining} API calls left but processing {len(list_repos)} "
+            f"repos may need ~{no_repos_estimate}. This run may stall/fail on rate limits.",
+            indent=2,
         )
 
     ###############################################
@@ -235,7 +236,9 @@ if __name__ == "__main__":
             base_sha = args.BASE_SHA if args.BASE_SHA else first_commit_main.sha
 
             if first_commit_main.sha != base_sha:
-                logger.error(f"\t First commit is different from expected, forced pushed?")
+                logger.error(
+                    f"First commit is different from expected, forced pushed?", indent=2
+                )
                 output_csv.append([repo_id, repo_url, "error_forced", first_commit_main.sha])
                 continue
 
@@ -251,7 +254,7 @@ if __name__ == "__main__":
                     None,
                 )
             except GithubException as e:
-                logger.error(f"\t Unknown exception listing PRs: {e}")
+                logger.error(f"Unknown exception listing PRs: {e}", indent=2)
                 output_csv.append([repo_id, repo_url, "exception_get_pr", e])
                 continue
 
