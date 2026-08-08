@@ -47,6 +47,7 @@ from util import (
     NOW_ISO,
 )
 
+SCRIPT_NAME = "gg_get_worksheet"
 
 # setup my own logger for this script, using the slogger/loguru backend
 from slogger.loguru_backend import logger, setup_logger
