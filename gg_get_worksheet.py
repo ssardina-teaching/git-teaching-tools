@@ -36,7 +36,7 @@ Google Google Workspace API: https://developers.google.com/drive/api/quickstart/
     $ pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
 """
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
-__copyright__ = "Copyright 2024"
+__copyright__ = "Copyright 2024-2026"
 
 from argparse import ArgumentParser
 from datetime import datetime
@@ -44,12 +44,7 @@ from gsheets import Sheets
 
 from util import (
     TIMEZONE,
-    UTC,
-    NOW,
     NOW_ISO,
-    NOW_TXT,
-    LOGGING_DATE,
-    LOGGING_FMT,
 )
 
 
