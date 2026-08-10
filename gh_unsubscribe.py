@@ -14,6 +14,7 @@ __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com  + ChatGPT frien
 __copyright__ = "Copyright 2026"
 
 from argparse import ArgumentParser
+import traceback
 from typing import List
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
@@ -29,11 +30,12 @@ from util import (
 
 SCRIPT_NAME = "gh_unsubscribe"
 SCRIPT_DESC = "Unsubscribe from notifications for a given PR or issue in multiple repos."
-import logging
-from slogger import setup_logging
-logger = setup_logging(SCRIPT_NAME, rotating_file="app.log", timezone=TIMEZONE, indent=2)
-logger.setLevel(logging.INFO)  # set the level of the application logger
-logger.root.setLevel(logging.WARNING)  # root logger above info: no 3rd party logs
+
+
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
+
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 
 if __name__ == "__main__":
@@ -48,13 +50,13 @@ if __name__ == "__main__":
     parser.add_argument("--title", help="title of PR to merge.")
     parser.add_argument(
         "-t",
-        "--token-file",
-        required=True,
-        help="File containing GitHub authorization token/password.",
+        "--token",
+        # default=os.environ.get("GHTOKEN") or os.environ.get("GH_TOKEN"),
+        help="File or string containing GitHub authorization token/password.",
     )
     args = parser.parse_args()
     logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
-    logger.info(args, depth=1)
+    logger.info(args, indent=1)
 
     pr_number = args.no
     pr_title = args.title
@@ -77,15 +79,13 @@ if __name__ == "__main__":
     ###############################################
     # Authenticate to GitHub
     ###############################################
-    if not args.token_file and not (args.user or args.password):
-        logger.error("No authentication provided, quitting....")
-        exit(1)
     try:
-        g: Github = utils_gh.open_gitHub(token_file=args.token_file)
+        g = utils_gh.open_gitHub(token=args.token)
     except Exception as e:
         logger.error(
-            f"Something wrong happened during GitHub authentication. Check credentials. Exception: {e}"
+            "Something wrong happened during GitHub authentication. Check credentials."
         )
+        traceback.print_exc()
         exit(1)
 
     ###############################################
@@ -110,13 +110,13 @@ if __name__ == "__main__":
 
         issue_node_id = utils_gh.get_issue_node_id(g, repo, pr_number)
         if issue_node_id is None:
-            logger.warning(f"PR {pr_number} not found in repo {repo_name}. Skipping.", depth=2)
+            logger.warning(f"PR {pr_number} not found in repo {repo_name}. Skipping.", indent=2)
             no_errors += 1
             continue
 
-        logger.info(f"Found node id for PR {pr_number}: {issue_node_id} - {pr_url}", depth=2)
+        logger.info(f"Found node id for PR {pr_number}: {issue_node_id} - {pr_url}", indent=2)
         data = utils_gh.unsubscribe(g, issue_node_id)
-        logger.info(f"Unsubscribed from PR {pr_number}: {data}", depth=2)
+        logger.info(f"Unsubscribed from PR {pr_number}: {data}", indent=2)
         no_unsubscribed += 1
 
     logger.info(
