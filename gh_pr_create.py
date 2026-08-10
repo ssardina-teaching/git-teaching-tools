@@ -1,6 +1,7 @@
 """
-Sync a batch of student/team repos (forks or GitHub Classroom repos) with an upstream
-source repo, by opening a "Sync Assignment" pull request in each one (or, if
+Create PRs in student repos to SYNC with an upstream source repo (teacher repo), 
+
+Script opens a "Sync Assignment" PR in each repo (or, if
 create_pr=False in sync_fork(), fast-forwarding the target branch directly instead).
 
 For each repo listed in REPO_CSV:
@@ -34,7 +35,7 @@ values: up_to_date, pr_created, pr_exists (an open sync PR was already there, sk
 to avoid duplicates), fast_forwarded, error_branch, error_pr, error_ff.
 """
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
-__copyright__ = "Copyright 2024-2025"
+__copyright__ = "Copyright 2024-2026"
 
 import csv
 from argparse import ArgumentParser

@@ -1,5 +1,6 @@
 """
-Script to merge a PR in all the repositories from a GitHub Classroom
+Script to merge PRs in a set of repositories. 
+This was useful when GH Classroom created PRs in each student forked repo and we wanted to merge them all at once.
 
 Uses PyGithub (https://github.com/PyGithub/PyGithub) as API to GitHub:
 
@@ -16,11 +17,8 @@ __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2019-2026"
 
 from argparse import ArgumentParser
-import os
 from pathlib import Path
-import sys
 import traceback
-from typing import List
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Github, GithubException
