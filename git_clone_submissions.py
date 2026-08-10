@@ -302,7 +302,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--file-timestamps",
         help="CSV filename to store the timestamps of submissions (default: %(default)s).",
-        default="submissions_timestamps.csv",
+        default="timestamps.csv",
     )
     # we could also use vars(parser.parse_args()) to make args a dictionary args['<option>']
     args = parser.parse_args()
