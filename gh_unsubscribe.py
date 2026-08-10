@@ -105,16 +105,40 @@ if __name__ == "__main__":
 
         # get the repo object
         repo = g.get_repo(repo_name)
+        
+
+        # check if a Feedback PR already exists (search by title, not PR number,
+        # since an earlier issue/PR can shift the Feedback PR's number away from 1)
+        if pr_number is None and pr_title is not None:
+            try:
+                pr = next(
+                    (
+                        pr
+                        for pr in repo.get_pulls(state="all", sort="created", direction="asc")
+                        if pr.title == pr_title
+                    ),
+                    None,
+                )
+                if pr is not None:
+                    pr_number = pr.number
+                    logger.info(f"Found PR {pr_number} with title '{pr_title}' in repo {repo_name}.", indent=2)
+                else:
+                    logger.warning(f"No PR with title '{pr_title}' found in repo {repo_name}. Skipping.", indent=2)
+                    no_errors += 1
+                    continue
+            except GithubException as e:
+                logger.error(f"Unknown exception listing PRs: {e}", indent=2)
+                continue
 
         pr_url = f"{repo_url}/pull/{pr_number}"
 
-        issue_node_id = utils_gh.get_issue_node_id(g, repo, pr_number)
+        issue_node_id = utils_gh.get_issue_node_id(g, repo, pr_number) #type: ignore - pr_number is an int here!
         if issue_node_id is None:
             logger.warning(f"PR {pr_number} not found in repo {repo_name}. Skipping.", indent=2)
             no_errors += 1
             continue
 
-        logger.info(f"Found node id for PR {pr_number}: {issue_node_id} - {pr_url}", indent=2)
+        logger.info(f"Found the node ID for PR {pr_number}: {issue_node_id} - {pr_url}", indent=2)
         data = utils_gh.unsubscribe(g, issue_node_id)
         logger.info(f"Unsubscribed from PR {pr_number}: {data}", indent=2)
         no_unsubscribed += 1
