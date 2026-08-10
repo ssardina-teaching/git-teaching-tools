@@ -55,7 +55,7 @@ Another tool that one can consider is [gh API CLI](https://github.com/cli/cli) t
 | `gh_tags_after.py`             | Get repos with a given tag after a date                            |
 | `gh_user_access.py`            | List repos in an org and their contributors with access levels     |
 | `gh_issue_labels.py`           | Get or update issue labels in a GH repo                            |
-| `gh_issue_transfer.py`        | Transfer issues between repos in different organizations           |
+| `gh_issue_transfer.py`         | Transfer issues between repos in different organizations           |
 | `gh_refresh_invite.sh`         | Refresh pending repo invitations by deleting and re-inviting       |
 | `gh_unsubscribe.py`            | Unsubscribe from issue/PR notifications                            |
 

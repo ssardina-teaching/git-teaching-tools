@@ -158,9 +158,12 @@ if __name__ == "__main__":
             dry_run=args.dry_run,
         )
         if output:
-            print(output)
+            logger.info(
+                f"User {username} removed from classroom: {args.ORG}/{args.CLASSROOM}: \n {output}",
+                indent=2,
+            )
         if not ok:
-            logger.error(f"\t Failed to remove {username} from classroom roster.")
+            logger.error(f"Failed to remove {username} from classroom roster.", indent=2)
             errors_csv.append([username, args.ORG, args.CLASSROOM])
             continue
         removed_csv.append([username, args.ORG, args.CLASSROOM])
@@ -172,9 +175,12 @@ if __name__ == "__main__":
                 "teacher", "remove", args.ORG, username, dry_run=args.dry_run
             )
             if output:
-                print(output)
+                logger.info(
+                    f"User {username} removed from organization: {args.ORG}: \n {output}",
+                    indent=2,
+                )
             if not ok:
-                logger.error(f"\t Failed to remove {username} from organization.")
+                logger.error(f"Failed to remove {username} from organization.", indent=2)
                 errors_csv.append([username, args.ORG, ""])
                 continue
             removed_csv.append([username, args.ORG, ""])
