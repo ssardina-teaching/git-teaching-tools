@@ -108,9 +108,10 @@ $ python ./gh_classroom_collect.py -t ~/.ssh/keys/gh-token-ssardina.txt RMIT-COS
 | `git_batch_commit.py`      | Batch commit to multiple repos                  |
 | `copy_bulk_submissions.py` | Copy folders to submissions                     |
 | `push_marking.sh`          | Push marking folder to submission repos         |
+| `mv_folder.sh`             | Bulk move folders to a                          |
 
 
-## Devel
+## Develoment info
 
 ### Logging
 
