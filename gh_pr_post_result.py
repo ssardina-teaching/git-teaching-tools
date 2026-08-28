@@ -432,13 +432,21 @@ if __name__ == "__main__":
 
             # 4.1. First, create a new comment in PR with automarker report (if any)
             if not args.no_report and args.REPORT_FOLDER is not None:
-                file_report = args.REPORT_FOLDER / f"{repo_id}.{args.extension}"
+                if "REPORT" in marking_repo:
+                    file_report = args.REPORT_FOLDER / marking_repo["REPORT"]
+                else:
+                    report_matches = list(
+                        args.REPORT_FOLDER.rglob(f"{repo_id}.{args.extension}")
+                    )
+                    file_report = (
+                        report_matches[0]
+                        if report_matches
+                        else args.REPORT_FOLDER / f"{repo_id}.{args.extension}"
+                    )
                 file_report_error = (
                     args.REPORT_FOLDER / f"{repo_id}_ERROR.{args.extension}"
                 )
-                if "REPORT" in marking_repo:
-                    file_report = args.REPORT_FOLDER / marking_repo["REPORT"]
-
+                print(file_report, file_report_error)
                 # if there is an error report, then use that one
                 error_text = None
                 if file_report_error.exists():
