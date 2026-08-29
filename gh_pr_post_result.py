@@ -446,7 +446,6 @@ if __name__ == "__main__":
                 file_report_error = (
                     args.REPORT_FOLDER / f"{repo_id}_ERROR.{args.extension}"
                 )
-                print(file_report, file_report_error)
                 # if there is an error report, then use that one
                 error_text = None
                 if file_report_error.exists():
