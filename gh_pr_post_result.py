@@ -432,38 +432,38 @@ if __name__ == "__main__":
 
             # 4.1. First, create a new comment in PR with automarker report (if any)
             if not args.no_report and args.REPORT_FOLDER is not None:
+                error_text = None
                 if "REPORT" in marking_repo:
+                    # the marking sheet has a specific report file for this repo/student
                     file_report = args.REPORT_FOLDER / marking_repo["REPORT"]
                 else:
                     report_matches = list(
                         args.REPORT_FOLDER.rglob(f"{repo_id}.{args.extension}")
                     )
-                    file_report = (
-                        report_matches[0]
-                        if report_matches
-                        else args.REPORT_FOLDER / f"{repo_id}.{args.extension}"
-                    )
-                file_report_error = (
-                    args.REPORT_FOLDER / f"{repo_id}_ERROR.{args.extension}"
-                )
+                    if not report_matches:
+                        # let's see now if there is an error report
+                        report_matches = list(
+                            args.REPORT_FOLDER.rglob(f"{repo_id}_ERROR.{args.extension}")
+                        )
+                        if report_matches:
+                            error_text = (
+                            "Your solution seems non-error free as requested in spec... 🥴"
+                        )
+                        else:
+                            logger.error(f"\t Error in repo {repo_name}: report not found.")
+                            errors_csv.append([repo_id, repo_url, "report_missing"])
+                            continue
+                    file_report = report_matches[0]
+                    logger.debug(f"\t Report file found: {file_report}")
+
+                # OK at this point we do have a file_report
+
                 # if there is an error report, then use that one
-                error_text = None
-                if file_report_error.exists():
-                    file_report = file_report_error
-                    error_text = (
-                        "Your solution seems non-error free as requested in spec... 🥴"
-                    )
-                if not file_report.exists():
-                    logger.error(
-                        f"\t Error in repo {repo_name}: report {file_report} (or _ERROR) not found."
-                    )
-                    errors_csv.append([repo_id, repo_url, "report_missing"])
-                    continue
                 if file_report.stat().st_size > 50000:
-                    logger.warning(f"\t Too large automarker report to publish")
+                    logger.warning(f"\t Too large automarker report to publish (debug printouts left?)")
                     issue_feedback_comment(
                         pr_feedback,
-                        f"Too large automarker report to publish... 🥴",
+                        f"Too large automarker report to publish; still has debug printouts left? 🥴",
                         args.dry_run,
                     )
                 else:
