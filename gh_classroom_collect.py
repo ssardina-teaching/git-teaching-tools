@@ -40,9 +40,9 @@ There are two ways:
 
     1. use my own slogger module (https://github.com/ssardina/slogger) that extends luguru and provides indentation and other features.
     2. use loguru directly, but then you have to manually add indentation and other features.
-    
+
 Both provide logger object but indentation is different:
-    1. logger.info("message", depth=2)  
+    1. logger.info("message", depth=2)
     2. logger.bind(depth=2).info("message")   or logger.bind(indent=2).info("message")
 """
 ############# OPTION 1: via slogger (NOT USED ANYMORE WITH LOGGER v2.0)
