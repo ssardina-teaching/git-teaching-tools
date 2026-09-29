@@ -368,137 +368,142 @@ if __name__ == "__main__":
     no_repos = len(repos)
     errors_csv = []
     posted_csv = []
-    for k, r in enumerate(repos):
-        if k % SLEEP_RATE == 0 and k > 0:
-            logger.info(f"Sleep for {SLEEP_TIME} seconds...")
-            time.sleep(SLEEP_TIME)
+    try:
+        for k, r in enumerate(repos):
+            if k % SLEEP_RATE == 0 and k > 0:
+                logger.info(f"Sleep for {SLEEP_TIME} seconds...")
+                time.sleep(SLEEP_TIME)
 
-        repo_no = r["NO"]
-        repo_id = r["REPO_ID_SUFFIX"].lower()
-        repo_name = r["REPO_ID"]
-        # repo_url = f"https://github.com/{repo_name}"
-        repo_url = r["REPO_HTTP"]
-        logger.info(
-            f"Processing repo {k+start_no}/{end_no}: {repo_no}:{repo_id} ({repo_url})..."
-        )
+            repo_no = r["NO"]
+            repo_id = r["REPO_ID_SUFFIX"].lower()
+            repo_name = r["REPO_ID"]
+            # repo_url = f"https://github.com/{repo_name}"
+            repo_url = r["REPO_HTTP"]
+            logger.info(
+                f"Processing repo {k+start_no}/{end_no}: {repo_no}:{repo_id} ({repo_url})..."
+            )
 
-        repo = g.get_repo(repo_name)
-        try:
-            # 1. Find the Feedback PR - feedback
-            #   see we cannot use .get_pull(1) bc it involves reviewing the PRs!
-            pr_feedback = repo.get_issue(number=1)
-            if pr_feedback.title != "Feedback":
-                pr_feedback = None
-                for pr in repo.get_pulls():
-                    if pr.title == "Feedback":
-                        logger.warning(
-                            f"\t Feedback PR found in number {pr.number}! Using this one: {repo_url}/pull/{pr.number}"
-                        )
-                        pr_feedback = repo.get_issue(number=pr.number)
-                        break
-                if pr_feedback is None:
-                    logger.error("\t Feedback PR not found! Skipping...")
-                    errors_csv.append([repo_id, repo_url, "missing_pr"])
+            repo = g.get_repo(repo_name)
+            try:
+                # 1. Find the Feedback PR - feedback
+                #   see we cannot use .get_pull(1) bc it involves reviewing the PRs!
+                pr_feedback = repo.get_issue(number=1)
+                if pr_feedback.title != "Feedback":
+                    pr_feedback = None
+                    for pr in repo.get_pulls():
+                        if pr.title == "Feedback":
+                            logger.warning(
+                                f"\t Feedback PR found in number {pr.number}! Using this one: {repo_url}/pull/{pr.number}"
+                            )
+                            pr_feedback = repo.get_issue(number=pr.number)
+                            break
+                    if pr_feedback is None:
+                        logger.error("\t Feedback PR not found! Skipping...")
+                        errors_csv.append([repo_id, repo_url, "missing_pr"])
+                        continue
+                logger.debug(f"\t Feedback PR found: {pr_feedback}")
+
+                # 2. Get the marking data for the student/repo
+                if repo_id not in marking_dict:
+                    logger.error(
+                        f"\t Repo {repo_id} not found in marking dictionary! Skipping..."
+                    )
+                    errors_csv.append([repo_id, repo_url,"missing_marking"])
                     continue
-            logger.debug(f"\t Feedback PR found: {pr_feedback}")
+                marking_repo = marking_dict[repo_id]
 
-            # 2. Get the marking data for the student/repo
-            if repo_id not in marking_dict:
-                logger.error(
-                    f"\t Repo {repo_id} not found in marking dictionary! Skipping..."
+                # 3. Check if we should skip the submission for any reason?
+                # (e.g., no certification/submission/marking, audit)
+                skip_post_msg, skip, skip_reason = check_submission(
+                    repo_id, marking_repo, args.batch, logger
                 )
-                errors_csv.append([repo_id, repo_url,"missing_marking"])
-                continue
-            marking_repo = marking_dict[repo_id]
+                if skip:
+                    if skip_post_msg is not None:
+                        issue_feedback_comment(pr_feedback, skip_post_msg, args.dry_run)
+                        logger.info(
+                            f"\t Feedback warning/error posted to {pr_feedback.html_url}."
+                        )
+                        posted_csv.append(
+                                [repo_id, repo_url, pr_feedback.html_url, skip_reason]
+                        )
+                    continue
 
-            # 3. Check if we should skip the submission for any reason?
-            # (e.g., no certification/submission/marking, audit)
-            skip_post_msg, skip, skip_reason = check_submission(
-                repo_id, marking_repo, args.batch, logger
-            )
-            if skip:
-                if skip_post_msg is not None:
-                    issue_feedback_comment(pr_feedback, skip_post_msg, args.dry_run)
-                    logger.info(
-                        f"\t Feedback warning/error posted to {pr_feedback.html_url}."
-                    )
-                    posted_csv.append(
-                            [repo_id, repo_url, pr_feedback.html_url, skip_reason]
-                    )
-                continue
+                # HERE THERE IS A PROPER SUBMISSION!
+                # Issue 1) the autograder report & 2) the feedback summary table
 
-            # HERE THERE IS A PROPER SUBMISSION!
-            # Issue 1) the autograder report & 2) the feedback summary table
-
-            # 4.1. First, create a new comment in PR with automarker report (if any)
-            if not args.no_report and args.REPORT_FOLDER is not None:
-                error_text = None
-                if "REPORT" in marking_repo:
-                    # the marking sheet has a specific report file for this repo/student
-                    file_report = args.REPORT_FOLDER / marking_repo["REPORT"]
-                else:
-                    report_matches = list(
-                        args.REPORT_FOLDER.rglob(f"{repo_id}.{args.extension}")
-                    )
-                    if not report_matches:
-                        # let's see now if there is an error report
+                # 4.1. First, create a new comment in PR with automarker report (if any)
+                if not args.no_report and args.REPORT_FOLDER is not None:
+                    error_text = None
+                    if "REPORT" in marking_repo:
+                        # the marking sheet has a specific report file for this repo/student
+                        file_report = args.REPORT_FOLDER / marking_repo["REPORT"]
+                    else:
                         report_matches = list(
-                            args.REPORT_FOLDER.rglob(f"{repo_id}_ERROR.{args.extension}")
+                            args.REPORT_FOLDER.rglob(f"{repo_id}.{args.extension}")
                         )
-                        if report_matches:
-                            error_text = (
-                            "Your solution seems non-error free as requested in spec... 🥴"
+                        if not report_matches:
+                            # let's see now if there is an error report
+                            report_matches = list(
+                                args.REPORT_FOLDER.rglob(f"{repo_id}_ERROR.{args.extension}")
+                            )
+                            if report_matches:
+                                error_text = (
+                                "Your solution seems non-error free as requested in spec... 🥴"
+                            )
+                            else:
+                                logger.error(f"\t Error in repo {repo_name}: report not found.")
+                                errors_csv.append([repo_id, repo_url, "report_missing"])
+                                continue
+                        file_report = report_matches[0]
+                        logger.debug(f"\t Report file found: {file_report}")
+
+                    # OK at this point we do have a file_report
+
+                    # if there is an error report, then use that one
+                    if file_report.stat().st_size > 50000:
+                        logger.warning(f"\t Too large automarker report to publish (debug printouts left?)")
+                        issue_feedback_comment(
+                            pr_feedback,
+                            f"Too large automarker report to publish; still has debug printouts left? 🥴",
+                            args.dry_run,
                         )
-                        else:
-                            logger.error(f"\t Error in repo {repo_name}: report not found.")
-                            errors_csv.append([repo_id, repo_url, "report_missing"])
-                            continue
-                    file_report = report_matches[0]
-                    logger.debug(f"\t Report file found: {file_report}")
+                    else:
+                        with open(file_report, "r") as report:
+                            report_text = report.read()
 
-                # OK at this point we do have a file_report
+                        skip_post_msg = f"# Feedback Report ✅\n\n"
+                        if FEEDBACK_REPORT_BEFORE is not None:
+                            skip_post_msg += FEEDBACK_REPORT_BEFORE
+                        skip_post_msg += f"\n\n ```{args.extension}\n{report_text}```"
+                        if error_text is not None:
+                            skip_post_msg += f"\n**NOTE**: {error_text}"
+                        if FEEDBACK_REPORT_AFTER is not None:
+                            skip_post_msg += f"\n\n{FEEDBACK_REPORT_AFTER}"
+                        issue_feedback_comment(pr_feedback, skip_post_msg, args.dry_run)
 
-                # if there is an error report, then use that one
-                if file_report.stat().st_size > 50000:
-                    logger.warning(f"\t Too large automarker report to publish (debug printouts left?)")
-                    issue_feedback_comment(
-                        pr_feedback,
-                        f"Too large automarker report to publish; still has debug printouts left? 🥴",
-                        args.dry_run,
-                    )
-                else:
-                    with open(file_report, "r") as report:
-                        report_text = report.read()
+                # 4.2 Finally, create COMMENT SUMMARY TABLE with the feedback summary
+                if not args.no_feedback:
+                    feedback_text = result_feedback(marking_repo)
+                    if feedback_text is not None:
+                        skip_post_msg = f"Dear @{repo_id}: find here the FEEDBACK & RESULTS for the project. \n\n {feedback_text}"
+                        skip_post_msg = feedback_text
+                        issue_feedback_comment(pr_feedback, skip_post_msg, args.dry_run)
 
-                    skip_post_msg = f"# Feedback Report ✅\n\n"
-                    if FEEDBACK_REPORT_BEFORE is not None:
-                        skip_post_msg += FEEDBACK_REPORT_BEFORE
-                    skip_post_msg += f"\n\n ```{args.extension}\n{report_text}```"
-                    if error_text is not None:
-                        skip_post_msg += f"\n**NOTE**: {error_text}"
-                    if FEEDBACK_REPORT_AFTER is not None:
-                        skip_post_msg += f"\n\n{FEEDBACK_REPORT_AFTER}"
-                    issue_feedback_comment(pr_feedback, skip_post_msg, args.dry_run)
+                logger.info(f"\t Feedback comment/report posted to {pr_feedback.html_url}.")
+                posted_csv.append([repo_id, repo_url, pr_feedback.html_url, "OK"])
 
-            # 4.2 Finally, create COMMENT SUMMARY TABLE with the feedback summary
-            if not args.no_feedback:
-                feedback_text = result_feedback(marking_repo)
-                if feedback_text is not None:
-                    skip_post_msg = f"Dear @{repo_id}: find here the FEEDBACK & RESULTS for the project. \n\n {feedback_text}"
-                    skip_post_msg = feedback_text
-                    issue_feedback_comment(pr_feedback, skip_post_msg, args.dry_run)
-
-            logger.info(f"\t Feedback comment/report posted to {pr_feedback.html_url}.")
-            posted_csv.append([repo_id, repo_url, pr_feedback.html_url, "OK"])
-
-        except GithubException as e:
-            logger.error(f"\t Error in repo {repo_name}: {e}")
-            errors_csv.append([repo_id, repo_url, e])
-        except Exception as e:
-            logger.error(
-                f"\t Unknown error in repo {repo_name}: {e} \n {traceback.format_exc()}"
-            )
-            errors_csv.append([repo_id, repo_url, e])
+            except GithubException as e:
+                logger.error(f"\t Error in repo {repo_name}: {e}")
+                errors_csv.append([repo_id, repo_url, e])
+            except Exception as e:
+                logger.error(
+                    f"\t Unknown error in repo {repo_name}: {e} \n {traceback.format_exc()}"
+                )
+                errors_csv.append([repo_id, repo_url, e])
+    except KeyboardInterrupt:
+        logger.warning("KeyboardInterrupt received. Stopping...")
+    except Exception as e:
+        logger.error(f"Unknown error: {e} \n {traceback.format_exc()}")
 
     logger.info(f"Finished! Total repos: {no_repos} - Successful: {len(posted_csv)} / Errors: {len(errors_csv)}.")
 
