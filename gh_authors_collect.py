@@ -151,9 +151,6 @@ def get_commits(
         )
         if since is not None:
             branch_commits = list(repo.get_commits(sha=branch, since=since_utc))
-            print(branch, len(branch_commits), since)
-            for c in branch_commits:
-                print(c.sha, c.commit.message)
         else:
             branch_commits = list(repo.get_commits(sha=branch))
         repo_commits = repo_commits.union(
