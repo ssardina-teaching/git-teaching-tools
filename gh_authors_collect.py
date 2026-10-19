@@ -16,18 +16,17 @@ Example usage:
 
     $ python gh_classroom_collect.py RMIT-COSC1127-3117-AI ai26-p0-warmup repos.csv
 """
-
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
-__copyright__ = "Copyright 2019-2025"
+__copyright__ = "Copyright 2019-2026"
+__license__ = "MIT"
 
 import csv
 from datetime import datetime, timedelta
 from pathlib import Path
 import time
-import os
 from argparse import ArgumentParser
 import traceback
-from typing import List
+from typing import List, Optional
 
 # https://pygithub.readthedocs.io/en/latest/introduction.html
 from github import Repository, GithubException
@@ -40,7 +39,7 @@ from util import (
     NOW_ISO    
 )
 
-SCRIPT_NAME = os.path.basename(__file__)
+SCRIPT_NAME = Path(__file__).name
 SCRIPT_NAME = "authors"
 
 # setup my own logger for this script, using the slogger/loguru backend
@@ -119,7 +118,7 @@ def get_contributions(repo: Repository):
 
 
 def get_commits(
-    repo: Repository, since=None, sha: str = None, length_msg=50
+    repo: Repository.Repository, since: Optional[datetime] = None, sha: Optional[str] = None, length_msg=50
 ) -> List[dict]:
     """
     Extracts all commits from a repo
@@ -140,12 +139,21 @@ def get_commits(
     else:
         repo_branches = [b.name for b in repo.get_branches()]
 
+
+    # We need to convert since to UTC timezone, as the GitHub API expects it in UTC
+    #  GH API expects a string in ISO 8601, https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-commits
+    # PyGithub will convert it to string ISO 8601 format, but we need to ensure it's in UTC timezone, not sure why. And we add 1 second to avoid getting the last commit again (as it is inclusive)
+    since_utc = since.astimezone(UTC) + timedelta(seconds=1) #type: ignore
+
     for branch in repo_branches:
         logger.debug(
             f"Processing branch: {branch}", indent=1
         )
         if since is not None:
-            branch_commits = list(repo.get_commits(sha=branch, since=since))
+            branch_commits = list(repo.get_commits(sha=branch, since=since_utc))
+            print(branch, len(branch_commits), since)
+            for c in branch_commits:
+                print(c.sha, c.commit.message)
         else:
             branch_commits = list(repo.get_commits(sha=branch))
         repo_commits = repo_commits.union(
@@ -279,7 +287,7 @@ if __name__ == "__main__":
     #   for each repo, we get its latest commit date into dictionary latest_commits
     commits_previous_csv = []
     latest_commits = {} # track latest commit date for each repo processed
-    if os.path.exists(csv_file):
+    if csv_file.exists():
         logger.info(
             f"Author file *{args.CSV_OUT}* exists. Extending it with the new commits: "
         )
@@ -320,7 +328,7 @@ if __name__ == "__main__":
         repo_http_url = row["REPO_HTTP"]
 
         # get since when we need to get the commits from this repo (if an)
-        since_date = latest_commits.get(repo_suffix, None)
+        since_date: Optional[datetime] = latest_commits.get(repo_suffix, None)
 
         logger.info(
             f"Processing {k}/{no_repos} repo {repo_no}:{repo_suffix} at {repo_http_url} : get commits since {since_date}"
@@ -415,12 +423,12 @@ if __name__ == "__main__":
 
     errors_csv.sort(key=lambda tup: tup["REPO"].lower())
     csv_error_file = csv_file.with_name(csv_file.stem + "_errors").with_suffix(".csv")
-    file_exists = os.path.isfile(csv_error_file)
+    file_exists =  csv_error_file.is_file()
     if file_exists or len(errors_csv) > 0:
         with open(csv_error_file, "a") as output_csv_file:
             csv_writer = csv.DictWriter(output_csv_file, fieldnames=CSV_HEADER_ERRORS)
 
             # Write header only if file is new/empty
-            if not file_exists or os.path.getsize(csv_error_file) == 0:
+            if not file_exists or csv_error_file.stat().st_size == 0:
                 csv_writer.writeheader()
             csv_writer.writerows(errors_csv)
