@@ -39,7 +39,6 @@ from util import (
     NOW_ISO    
 )
 
-SCRIPT_NAME = Path(__file__).name
 SCRIPT_NAME = "authors"
 
 # setup my own logger for this script, using the slogger/loguru backend
@@ -61,7 +60,6 @@ CSV_HEADER = [
 CSV_HEADER_TYPE = {"DATE": datetime, "ADDITIONS": int, "DELETIONS": int}
 
 CSV_HEADER_STATS = ["REPO", "AUTHOR", "COMMITS", "ADDITIONS", "DELETIONS", "LAST"]
-CSV_HEADER_STATS_TYPE = {"LAST": datetime, "ADDITIONS": int, "DELETIONS": int}
 
 CSV_HEADER_ERRORS = ["REPO", "ERROR"]
 GH_URL_PREFIX = "https://github.com/"
@@ -82,39 +80,6 @@ IGNORE_COMMENTS = [
 
 SLEEP_RATE = 10  # number of repos to process before sleeping
 SLEEP_TIME = 5  # sleep time in seconds between API calls
-
-
-def get_contributions(repo: Repository):
-    """Use GH contribution API to get the contributions of each author
-    Also return total number of contributions in repo
-
-    Args:
-        repo (Repository): handle to GitHub repository
-
-    Returns:
-        number of commits in repo
-        dict author -> number of commits
-        dict author -> number of additions
-        dict author -> number of deletions
-    """
-    author_total = {}
-    author_add = {}
-    author_del = {}
-
-    for contribution in repo.get_stats_contributors():
-        if contribution.author.login in IGNORE_USERS:
-            continue
-        # get the author of the contribution stat
-        author_id = contribution.author.login
-
-        author_total[author_id] = contribution.total
-        author_add[author_id] = -1
-        author_del[author_id] = -1
-
-    # get all commits in the repo
-    no_commits = sum([author_total[author_id] for author_id in author_total])
-
-    return no_commits, author_total, author_add, author_del
 
 
 def get_commits(
@@ -143,13 +108,13 @@ def get_commits(
     # We need to convert since to UTC timezone, as the GitHub API expects it in UTC
     #  GH API expects a string in ISO 8601, https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-commits
     # PyGithub will convert it to string ISO 8601 format, but we need to ensure it's in UTC timezone, not sure why. And we add 1 second to avoid getting the last commit again (as it is inclusive)
-    since_utc = since.astimezone(UTC) + timedelta(seconds=1) #type: ignore
+    since_utc = since.astimezone(UTC) + timedelta(seconds=1) if since is not None else None #type: ignore
 
     for branch in repo_branches:
         logger.debug(
             f"Processing branch: {branch}", indent=1
         )
-        if since is not None:
+        if since_utc is not None:
             branch_commits = list(repo.get_commits(sha=branch, since=since_utc))
         else:
             branch_commits = list(repo.get_commits(sha=branch))
@@ -184,16 +149,13 @@ def get_commits(
             continue
         message = message[:length_msg] + "..." if len(message) > length_msg else message
         url = c.html_url
+        date = c.commit.author.date.replace(tzinfo=UTC).astimezone(TIMEZONE)
         try:
-            # commit_details = repo.get_commit(sha)
-            commit_details = c
-            additions = commit_details.stats.additions
-            deletions = commit_details.stats.deletions
-            date = commit_details.commit.author.date
-            date = date.replace(tzinfo=UTC).astimezone(TIMEZONE)
+            additions = c.stats.additions
+            deletions = c.stats.deletions
         except Exception as e:
-            logger.debug(f"Error getting commit details: {e}")
-            additions = deletions = 0  # Fallback if details aren't available
+            logger.debug(f"Error getting commit stats for {sha}: {e}")
+            additions = deletions = 0  # Fallback if stats aren't available
 
         commits_data.append(
             {
@@ -212,7 +174,7 @@ def get_commits(
 
 if __name__ == "__main__":
     parser = ArgumentParser(
-        description="Extract no of commits per author in a collection of repositories given as a CSV file"
+        description="Extract no of commits per author in a collection of repositories given as a CSV file. "
         "CSV HEADERS: ORG_NAME, REPO_ID_PREFIX, REPO_ID_SUFFIX, REPO_ID, REPO_GIT"
     )
     parser.add_argument("REPO_CSV", help="List of repositories to get data from.")
@@ -236,12 +198,6 @@ if __name__ == "__main__":
         nargs="+",
         metavar="<list names>",
         help="ignore these authors GH usernames (teachers).",
-    )
-    parser.add_argument(
-        "--gh-contributions",
-        "-ghc",
-        action="store_true",
-        help="Use GitHub contribution to main stats (Default: %(default)s).",
     )
     args = parser.parse_args()
     logger.info(f"Starting script {SCRIPT_NAME} on {TIMEZONE}: {NOW_ISO}")
@@ -288,7 +244,7 @@ if __name__ == "__main__":
         logger.info(
             f"Author file *{args.CSV_OUT}* exists. Extending it with the new commits: "
         )
-        with open(args.CSV_OUT, "r") as f:
+        with open(args.CSV_OUT, "r", newline="") as f:
             csv_reader = csv.DictReader(f, fieldnames=CSV_HEADER)
             next(csv_reader)  # skip header
             commits_previous_csv = list(csv_reader)
@@ -315,7 +271,7 @@ if __name__ == "__main__":
     no_repos = len(repos)
     # repos.sort(key=lambda tup: tup["REPO_ID_SUFFIX"].lower())
     for k, row in enumerate(repos, start=1):
-        if k % SLEEP_RATE == 0 and k > 0:
+        if k % SLEEP_RATE == 0:
             logger.info(f"Sleep for {SLEEP_TIME} seconds...")
             time.sleep(SLEEP_TIME)
 
@@ -407,13 +363,13 @@ if __name__ == "__main__":
     #   - author_stats_cvs: all authors stats of all repos
 
     # 6. Finally, write two csv files: commit list, and aggregated contributions
-    with open(csv_file, "w") as output_csv_file:
+    with open(csv_file, "w", newline="") as output_csv_file:
         csv_writer = csv.DictWriter(output_csv_file, fieldnames=CSV_HEADER)
         csv_writer.writeheader()
         csv_writer.writerows(commits_csv)
 
     csv_stat_file = csv_file.with_name(csv_file.stem + "_stats").with_suffix(".csv")
-    with open(csv_stat_file, "w") as output_csv_file:
+    with open(csv_stat_file, "w", newline="") as output_csv_file:
         csv_writer = csv.DictWriter(output_csv_file, fieldnames=CSV_HEADER_STATS)
         csv_writer.writeheader()
         csv_writer.writerows(author_stats_cvs)
@@ -422,7 +378,7 @@ if __name__ == "__main__":
     csv_error_file = csv_file.with_name(csv_file.stem + "_errors").with_suffix(".csv")
     file_exists =  csv_error_file.is_file()
     if file_exists or len(errors_csv) > 0:
-        with open(csv_error_file, "a") as output_csv_file:
+        with open(csv_error_file, "a", newline="") as output_csv_file:
             csv_writer = csv.DictWriter(output_csv_file, fieldnames=CSV_HEADER_ERRORS)
 
             # Write header only if file is new/empty
