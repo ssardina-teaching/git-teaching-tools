@@ -194,6 +194,11 @@ if __name__ == "__main__":
         "--tag", help="if given, check up to a given tag (otherwise all repo)."
     )
     parser.add_argument(
+        "--redo",
+        action="store_true",
+        help="if given, redo the stats (otherwise only new commits will be parsed)."
+    )
+    parser.add_argument(
         "--ignore",
         nargs="+",
         metavar="<list names>",
@@ -242,7 +247,7 @@ if __name__ == "__main__":
     latest_commits = {} # track latest commit date for each repo processed
     if csv_file.exists():
         logger.info(
-            f"Author file *{args.CSV_OUT}* exists. Extending it with the new commits: "
+            f"Author file *{args.CSV_OUT}* exists. Extending it with the new commits..."
         )
         with open(args.CSV_OUT, "r", newline="") as f:
             csv_reader = csv.DictReader(f, fieldnames=CSV_HEADER)
@@ -255,8 +260,18 @@ if __name__ == "__main__":
                 if key in row:
                     row[key] = datetime.fromisoformat(row[key]) if cast == datetime else cast(row[key])
 
+        # Filter commits_previous_csv to remove the specified repos if --redo is set
+        if args.redo:
+            logger.info("Redo flag is set. Will reprocess all commits for the repos.")
+            if args.repos is not None:
+                commits_previous_csv = [
+                    commit for commit in commits_previous_csv if commit["REPO"] not in args.repos
+                ]
+            else:
+                commits_previous_csv = []
+
         # extract the latest commit date for each repo (so we can gather from there on)
-        # TODO: eextract it from the stat file in column LAST that we now hve.
+        # iterate over the list of ALL commits in the previous CSV file, and for each repo, keep the latest commit date
         for commits in commits_previous_csv:
             repo_id = commits["REPO"]
             if (
