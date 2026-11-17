@@ -154,10 +154,15 @@ def run_query(query, variables=None):
 
     query = {"query": query, "variables": variables}
     response = requests.post(URL, json=query, headers=HEADERS)
-    if response.status_code == 200:
-        return response.json()
-    else:
+    if response.status_code != 200:
         raise Exception(f"Query failed: {response.status_code}. {response.text}")
+
+    # GraphQL reports most errors (bad permissions, not found, etc.) with HTTP 200
+    result = response.json()
+    if result.get("errors"):
+        messages = "; ".join(e.get("message", str(e)) for e in result["errors"])
+        raise Exception(f"GraphQL error: {messages}")
+    return result
 
 
 def get_repository_node_id(owner, name):
@@ -172,35 +177,28 @@ def get_repository_node_id(owner, name):
 
 
 def get_issues(owner, name, closed=False):
-    """Fetches a list of all open issue Node IDs from the source repo."""
-    if not closed:
-        query = """
-        query($owner: String!, $name: String!) {
-        repository(owner: $owner, name: $name) {
-            issues(states: OPEN, first: 100) {
-            nodes {
-                id
-                number
-                title
-            }
-            }
-        }
-        }
-        """
-    else:
-        query = """
-        query($owner: String!, $name: String!) {
-        repository(owner: $owner, name: $name) {
-            issues(first: 100) {
-            nodes {
-                id
-                number
-                title
-                state
-            }
-            }
-        }
-        }
-        """
-    result = run_query(query, {"owner": owner, "name": name})
-    return result["data"]["repository"]["issues"]["nodes"]
+    """Fetch all issues (id, number, title, state) of a repo, following pagination.
+
+    Only open issues are returned unless closed=True, in which case both open and
+    closed issues are returned. Pull requests are not included.
+    """
+    states = "[OPEN, CLOSED]" if closed else "[OPEN]"
+    query = f"""
+    query($owner: String!, $name: String!, $cursor: String) {{
+      repository(owner: $owner, name: $name) {{
+        issues(states: {states}, first: 100, after: $cursor) {{
+          pageInfo {{ hasNextPage endCursor }}
+          nodes {{ id number title state }}
+        }}
+      }}
+    }}
+    """
+    issues = []
+    cursor = None
+    while True:
+        result = run_query(query, {"owner": owner, "name": name, "cursor": cursor})
+        page = result["data"]["repository"]["issues"]
+        issues.extend(page["nodes"])
+        if not page["pageInfo"]["hasNextPage"]:
+            return issues
+        cursor = page["pageInfo"]["endCursor"]
