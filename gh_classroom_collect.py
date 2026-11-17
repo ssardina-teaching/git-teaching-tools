@@ -13,16 +13,15 @@ Example usage:
 
     $ python gh_classroom_collect.py RMIT-COSC1127-3117-AI ai26-p0-warmup repos.csv
 """
-
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2019-2026"
 import csv
+from pathlib import Path
 import re
 import traceback
 
 from argparse import ArgumentParser
 from github import GithubException
-import os
 
 import utils_gh
 from util import (
@@ -30,37 +29,17 @@ from util import (
     TIMEZONE,
     NOW_ISO,
 )
-SCRIPT_NAME = "collect"
+SCRIPT_NAME = "gh_collect"
 LOG_LEVEL = "INFO"
 
-"""
-Logging configuration
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
 
-There are two ways:
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
-    1. use my own slogger module (https://github.com/ssardina/slogger) that extends luguru and provides indentation and other features.
-    2. use loguru directly, but then you have to manually add indentation and other features.
-
-Both provide logger object but indentation is different:
-    1. logger.info("message", depth=2)
-    2. logger.bind(depth=2).info("message")   or logger.bind(indent=2).info("message")
-"""
-############# OPTION 1: via slogger (NOT USED ANYMORE WITH LOGGER v2.0)
-# from slogger.loguru_backend import logger, setup_logging
-# setup_logging(
-#     name=SCRIPT_NAME,
-#     level=LEVEL,
-#     colorize=True,
-#     short_levels=True,
-#     indent=2,
-#     flush=False,
-# )
-# logger.remove(0)  # Remove default logger to prevent duplicate logs.
-
-############# OPTION 2: via loguru directly + configuration
-from slogger.loguru_backend import Slogger
-logger = Slogger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
-
+#####################################
+# LOCAL GLOBAL VARIABLES FOR SCRIPT
+#####################################
 CSV_GITHUB_USERNAME = "github_username"
 CSV_GITHUB_IDENTIFIER = "identifier"
 
@@ -71,7 +50,11 @@ if __name__ == "__main__":
     )
     parser.add_argument("ORG_NAME", help="Organization name for GitHub Classroom")
     parser.add_argument("REPO_ID_PREFIX", help="Prefix string for the assignment.")
-    parser.add_argument("CSV", help="CSV file where to store the set of repo links.")
+    parser.add_argument(
+        "CSV",
+        type=Path,
+        help="CSV file where to store the set of repo links."
+    )
     parser.add_argument(
         "-t",
         "--token",
