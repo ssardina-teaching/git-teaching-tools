@@ -25,36 +25,32 @@ Example:
 
 $ python gh_transfer_issues.py  RMIT-COSC2780-2973-IDM25/project-exam-timetabling-solution RMIT-COSC2780-2973-IDM26/test -t ~/.ssh/keys/gh-token-ssardina.txt
 """
+__author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
+__copyright__ = "Copyright 2024-2026"
 
 import argparse
 import time
+import traceback
 import requests
 from github.GithubException import GithubException
-import util
+
 import utils_gh
-
-
-SCRIPT_NAME = "gh_issue_trsf"
-
-# slogger: https://github.com/ssardina/slogger
-from slogger.loguru_backend import logger, setup_logging
-
-LEVEL = "INFO"
-# LEVEL = "DEBUG"
-setup_logging(
-    name=SCRIPT_NAME,
-    level=LEVEL,
-    colorize=True,
-    short_levels=True,
-    indent=2,
-    flush=False,
+from util import (
+    parse_full_repo,
+    TIMEZONE,
+    add_csv,
 )
-logger.remove(0)  # Remove default logger to prevent duplicate logs.
+# setup my own logger for this script, using the slogger/loguru backend
+from slogger.loguru_backend import logger, setup_logger
+
+SCRIPT_NAME = "gh_issue_transfer"
+setup_logger(source=SCRIPT_NAME, timezone=TIMEZONE.key)
 
 
 # ==========================
 # Helpers
 # ==========================
+
 
 def transfer_issue(issue_id, target_repo_id):
     """Executes the transfer mutation for a single issue."""
@@ -65,8 +61,12 @@ def transfer_issue(issue_id, target_repo_id):
       }
     }
     """
-    logger.debug(f"Running mutation to transfer issue {issue_id} to repo {target_repo_id} on mutation: {mutation}")
-    return utils_gh.run_query(mutation, {"issueId": issue_id, "repositoryId": target_repo_id})
+    logger.debug(
+        f"Running mutation to transfer issue {issue_id} to repo {target_repo_id} on mutation: {mutation}"
+    )
+    return utils_gh.run_query(
+        mutation, {"issueId": issue_id, "repositoryId": target_repo_id}
+    )
 
 
 def transfer_issues(repo1, repo2, closed=False):
@@ -90,8 +90,10 @@ def transfer_issues(repo1, repo2, closed=False):
     # 2. Loop and Transfer
     for issue in issues:
         try:
-            logger.info(f"🔄 Transferring issue #{issue['number']}: {issue['title']}...")
-            transfer_issue(issue['id'], repo2_id)
+            logger.info(
+                f"🔄 Transferring issue #{issue['number']}: {issue['title']}..."
+            )
+            transfer_issue(issue["id"], repo2_id)
             logger.info("✅ Done!", depth=1)
             # Small sleep to avoid hitting secondary rate limits
             time.sleep(0.5)
@@ -120,35 +122,39 @@ def main():
     parser = argparse.ArgumentParser(
         description="Transfer issues between GitHub repositories across organizations"
     )
+    parser.add_argument("SOURCE_REPO", help="Source repository in format org/repo")
+    parser.add_argument("DEST_REPO", help="Destination repository in format org/repo")
     parser.add_argument(
-        "SOURCE_REPO", help="Source repository in format org/repo"
+        "--closed",
+        action="store_true",
+        help="Whether to transfer closed issues as well",
     )
     parser.add_argument(
-        "DEST_REPO", help="Destination repository in format org/repo"
+        "--dry-run",
+        action="store_true",
+        help="Run the script without making any changes (for testing)",
     )
     parser.add_argument(
-        "--closed", action="store_true", help="Whether to transfer closed issues as well"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Run the script without making any changes (for testing)"
-    )
-    parser.add_argument(
-        "--token-file", "-t", required=True, help="File containing GitHub token"
+        "--token",
+        "-t",
+        help="File containing GitHub token"
     )
     args = parser.parse_args()
     logger.info(args)
 
     source_repo_full = args.SOURCE_REPO
     dest_repo_full = args.DEST_REPO
-    source_org_name, source_repo_name = util.parse_full_repo(source_repo_full)
-    dest_org_name, dest_repo_name = util.parse_full_repo(dest_repo_full)
+    source_org_name, source_repo_name = parse_full_repo(source_repo_full)
+    dest_org_name, dest_repo_name = parse_full_repo(dest_repo_full)
 
     same_org = False
     if source_org_name == dest_org_name:
         same_org = True
 
     if not args.closed:
-        logger.info("Only open issues will be transferred. Use --closed to transfer closed issues as well.")
+        logger.info(
+            "Only open issues will be transferred. Use --closed to transfer closed issues as well."
+        )
         confirm = input("Are you sure you want to continue? (y/n): ")
         if confirm.lower() != "y":
             logger.warning("Aborting transfer.")
@@ -157,17 +163,14 @@ def main():
     ###############################################
     # Authenticate to GitHub
     ###############################################
-    if not args.token_file:
-        logger.error("No token file for authentication provided, quitting....")
-        exit(1)
     try:
-        gh = utils_gh.open_gitHub(token_file=args.token_file)
-    except:
+        gh = utils_gh.open_gitHub(token=args.token)
+    except Exception as e:
         logger.error(
             "Something wrong happened during GitHub authentication. Check credentials."
         )
+        traceback.print_exc()
         exit(1)
-
 
     # not really needed.... but we can check if the repos exist and we have access to them before starting the transfer
     try:
@@ -181,7 +184,9 @@ def main():
     #  if same org, then temp is just the source repo
     #  otherwise, create temp in source to get all issues, then transfer ownership to dest org, then transfer issues to dest repo, then delete temp
     if same_org:
-        logger.info("Source and destination repos are in the same organization. No need for temporary repo.")
+        logger.info(
+            "Source and destination repos are in the same organization. No need for temporary repo."
+        )
         gh_temp_repo = gh.get_repo(source_repo_full)
     else:
         # ==========================
@@ -195,29 +200,37 @@ def main():
             gh_temp_repo = gh_source_org.create_repo(
                 name="temp", private=True, auto_init=True
             )
-            logger.info(f"Created temporary repo {gh_temp_repo.full_name} for issue transfer.")
+            logger.info(
+                f"Created temporary repo {gh_temp_repo.full_name} for issue transfer."
+            )
         except GithubException as e:
             logger.error(f"Error creating temp repo in source: {e}")
             gh_temp_repo = gh.get_repo(f"{source_org_name}/temp")
-            logger.info(f"Using existing temporary repo {gh_temp_repo.full_name} for issue transfer.")
+            logger.info(
+                f"Using existing temporary repo {gh_temp_repo.full_name} for issue transfer."
+            )
             # exit(1)
 
         # # ==========================
         # # 2. Transfer issues A -> T
         # # ==========================
-        logger.info(f"Transferring ALL issues {args.SOURCE_REPO} ---> {gh_temp_repo.full_name}")
+        logger.info(
+            f"Transferring ALL issues {args.SOURCE_REPO} ---> {gh_temp_repo.full_name}"
+        )
         transfer_issues(args.SOURCE_REPO, gh_temp_repo.full_name, closed=args.closed)
 
         # ==========================
         # 3. Transfer repo T to destination org
         # ==========================
         # easier and clearner to do via REST API than GraphQL, as there is a specific endpoint for this: https://docs.github.com/rest/repos/repos#transfer-a-repository
-        logger.info(f"Transferring repo {gh_temp_repo.full_name} to organization {dest_org_name}")
-        transfer_url = (
-            f"https://api.github.com/repos/{source_org_name}/temp/transfer"
+        logger.info(
+            f"Transferring repo {gh_temp_repo.full_name} to organization {dest_org_name}"
         )
+        transfer_url = f"https://api.github.com/repos/{source_org_name}/temp/transfer"
         response = requests.post(
-            transfer_url, headers={"Authorization": f"token {utils_gh.TOKEN}"}, json={"new_owner": dest_org_name}
+            transfer_url,
+            headers={"Authorization": f"token {utils_gh.TOKEN}"},
+            json={"new_owner": dest_org_name},
         )
         if response.status_code not in (202, 201):
             raise RuntimeError(f"Repo transfer failed: {response.text}")
