@@ -75,7 +75,6 @@ Output: appends to pr_comment.csv (successful posts) and pr_comment_errors.csv
 """
 __author__ = "Sebastian Sardina - ssardina - ssardina@gmail.com"
 __copyright__ = "Copyright 2024-2026"
-import os
 import sys
 import traceback
 import time
@@ -158,9 +157,9 @@ def issue_feedback_comment(
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Merge PRs in multiple repos")
-    parser.add_argument("REPO_CSV", help="List of repositories to post comments to.")
-    parser.add_argument("MARKING_CSV", help="List of student results.")
-    parser.add_argument("CONFIG", help="Python report builder configuration file.")
+    parser.add_argument("REPO_CSV", type=Path, help="List of repositories to post comments to.")
+    parser.add_argument("MARKING_CSV", type=Path, help="List of student results.")
+    parser.add_argument("CONFIG", type=Path, help="Python report builder configuration file.")
     parser.add_argument(
         "REPORT_FOLDER",
         nargs="?",
@@ -180,8 +179,8 @@ if __name__ == "__main__":
         help="if given, only the teams specified will be parsed.",
     )
     parser.add_argument(
-        "--ignore", 
-        nargs="+", 
+        "--ignore",
+        nargs="+",
         metavar="STR",
         help="if given, ignore these repos.")
     parser.add_argument(
@@ -203,8 +202,8 @@ if __name__ == "__main__":
         "--end", "-e", type=int, metavar="INT", help="repo no to end processing."
     )
     parser.add_argument(
-        "--batch", 
-        "-b", 
+        "--batch",
+        "-b",
         type=str,
         help="batch to post (column BATCH, if any).")
     parser.add_argument(
@@ -240,17 +239,17 @@ if __name__ == "__main__":
     if args.REPORT_FOLDER is None:
         args.no_report = True
 
-    if not os.path.isfile(args.CONFIG):
+    if not args.CONFIG.is_file():
         logger.error(
             f"Feedback builder configuration file {args.CONFIG} not found or not a file."
         )
         exit(1)
 
-    if not os.path.isfile(args.REPO_CSV):
+    if not args.REPO_CSV.is_file():
         logger.error(f"Repo CSV file {args.REPO_CSV} not found.")
         exit(1)
 
-    if not os.path.isfile(args.MARKING_CSV):
+    if not args.MARKING_CSV.is_file():
         logger.error(f"Marking CSV file {args.MARKING_CSV} not found.")
         exit(1)
 
@@ -262,18 +261,18 @@ if __name__ == "__main__":
 
     if args.no_report and args.no_feedback:
         logger.error(
-            f"Nothing to post as both --no-report and --no-feedback were set. Please check your options."
+            "Nothing to post as both --no-report and --no-feedback were set. Please check your options."
         )
         exit(1)
 
     if (args.start != 1 or args.end) is not None and (args.repos or args.ignore or args.batch):
         logger.error(
-            f"Cannot use --start/--end and --repos/--ignore/--batch at the same time. Please check your options."
+            "Cannot use --start/--end and --repos/--ignore/--batch at the same time. Please check your options."
         )
         exit(1)
 
     if (args.start < 1) or (args.end and args.start > args.end):
-        logger.error(f"Start number has to be 1+ and less than --end.")
+        logger.error("Start number has to be 1+ and less than --end.")
         exit(1)
 
     ###############################################
@@ -508,7 +507,7 @@ if __name__ == "__main__":
     logger.info(f"Finished! Total repos: {no_repos} - Successful: {len(posted_csv)} / Errors: {len(errors_csv)}.")
 
     # add the batch to the CSV data if it is present, otherwise add an empty string
-    posted_csv = [x + [args.batch if args.batch else ""] for x in posted_csv] 
+    posted_csv = [x + [args.batch if args.batch else ""] for x in posted_csv]
     errors_csv = [x + [args.batch if args.batch else ""] for x in errors_csv]
 
     if not args.dry_run:
